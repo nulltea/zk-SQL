@@ -1,0 +1,20 @@
+.idea
+.vscode
+
+node_modules
+.env
+coverage
+coverage.json
+typechain
+
+#Hardhat files
+cache
+artifacts
+*.zkey
+*.r1cs
+*.ptau
+*.sym
+Q1/contracts/circuits/hitandblow_js
+verification_key.json
+verifier.sol
+Part1/contracts/circuits/MastermindVariation_js
