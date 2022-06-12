@@ -11,6 +11,7 @@ template INSERT(c,r) {
     signal input tableCommit;
 
     signal input insertRow[c];
+    
     signal output newTableCommit;
     signal output out[r+1][c];
 
@@ -46,6 +47,7 @@ template INSERT(c,r) {
         out[r][j] <== insertRow[j];
     }
 
+    // Hash table and header again to produce new commitment.
     component newHasher = HashTable(c,r+1);
 
     for (i=0;i<c;i++) {

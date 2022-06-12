@@ -14,6 +14,7 @@ describe("zk-SQL", function () {
     let selectCircuit;
     let insertCircuit;
     let updateCircuit;
+    let deleteCircuit;
     // List of valid words to assert during circuit compile, must be agreed before game.
     const header = [1, 2, 3, 4, 5];
     const table = [
@@ -28,10 +29,15 @@ describe("zk-SQL", function () {
     before(async () => {
         selectCircuit = await wasm_tester("circuits/select.circom");
         await selectCircuit.loadConstraints();
+
         insertCircuit = await wasm_tester("circuits/insert.circom");
         await insertCircuit.loadConstraints();
+
         updateCircuit = await wasm_tester("circuits/update.circom");
         await updateCircuit.loadConstraints();
+
+        deleteCircuit = await wasm_tester("circuits/delete.circom")
+        await deleteCircuit.loadConstraints();
     });
 
     it("SELECT * FROM table1 WHERE '2' = 4", async () => {
@@ -113,6 +119,27 @@ describe("zk-SQL", function () {
             [8, 4, 8, 8, 8],
             [4, 5, 6, 7, 2],
             [8, 4, 8, 8, 8],
+        ]
+        let newTableHash = await hashTable(header, results);
+
+        assert(Fr.eq(Fr.e(witness[0]),Fr.e(1)));
+        assert(Fr.eq(Fr.e(witness[1]),Fr.e(newTableHash)), "must produce same hash");
+    });
+
+    it("DELETE FROM table1 WHERE '2' = 4", async () => {
+        const INPUT = {
+            header: header,
+            table: table,
+            tableCommit: tableHash,
+            whereColumn: [0, 2, 0, 0, 0],
+            whereValues: [0, 4, 0, 0, 0],
+        };
+
+        const witness = await deleteCircuit.calculateWitness(INPUT, true);
+
+        const results = [
+            [2, 3, 4, 3, 8],
+            [4, 5, 6, 7, 2],
         ]
         let newTableHash = await hashTable(header, results);
 

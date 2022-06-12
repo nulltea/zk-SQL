@@ -28,7 +28,7 @@ template HashTable(c,r) {
             preImage.nums[idx] <== table[i][j];
         }
     }
-
+    
     hasher.inputs[0] <== preImage.sum;
 
     out <== hasher.out;

@@ -5,7 +5,7 @@ include "../node_modules/circomlib/circuits/gates.circom";
 include "./hashTable.circom";
 include "./utils.circom";
 
-template SELECT(c,r) {
+template DELETE(c,r) {
     signal input header[c];
     signal input table[r][c];
     signal input tableCommit;
@@ -14,8 +14,7 @@ template SELECT(c,r) {
     signal input whereColumn[c];
     signal input whereValues[c];
 
-    signal input results[r][c];
-
+    signal output newTableCommit;
     signal output out[r][c];
 
     var i;
@@ -40,6 +39,7 @@ template SELECT(c,r) {
     component equalColumn[r][c];
     component equalCell[r][c];
     component filterRow[r];
+    component rowsToDelete[r];
 
     for (i=0; i<r; i++) {
         filterRow[i] = MultiAND(c);
@@ -56,11 +56,39 @@ template SELECT(c,r) {
             filterRow[i].in[j] <== equalCell[i][j].out;
         }
 
+        // TODO: find a way to skip rows without "Non-quadratic constraint"
+        // if (filterRow[i].out == 1) {
+        //     rowIdx++;
+        // }
+        // out[rowIdx][j] <== this won't work
+        //
+        // It might be possible to do something like `QuinSelector` but it won't be optimal.
+        // For now "skipped" rows will be zeroed, so it won't affect summed preimage and hash commitment.
+
+        rowsToDelete[i] = NOT();
+        rowsToDelete[i].in <== filterRow[i].out;
+
         for (j=0; j<c; j++) {
-            out[i][j] <== table[i][j] * filterRow[i].out;
-            results[i][j] === out[i][j];
+            out[i][j] <== table[i][j] * rowsToDelete[i].out;
         }
     }
+
+    // TODO: replace code above with SELECT component.
+
+    // Hash table and header again to produce new commitment.
+    component newHasher = HashTable(c,r);
+
+    for (i=0;i<c;i++) {
+        newHasher.header[i] <== header[i];
+    }
+
+    for (i=0;i<r;i++) {
+        for (j=0;j<c;j++) {
+            newHasher.table[i][j] <== out[i][j];
+        }
+    }
+
+    newTableCommit <== newHasher.out;
 }
 
-component main {public [tableCommit, whereColumn, whereValues, results]} = SELECT(5, 5);
+component main {public [tableCommit, whereColumn, whereValues]} = DELETE(5, 5);
