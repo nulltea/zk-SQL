@@ -11,23 +11,25 @@ template INSERT(c,r) {
     signal input tableCommit;
 
     signal input insertRow[c];
-    signal output out[r+1][c];
     signal output newTableCommit;
+    signal output out[r+1][c];
 
     var i;
     var j;
+
+    // Hash table along with header
     component hasher = HashTable(c,r);
 
     for (i=0;i<c;i++) {
         hasher.header[i] <== header[i];
     }
-
     for (i=0;i<r;i++) {
         for (j=0;j<c;j++) {
             hasher.table[i][j] <== table[i][j];
         }
     }
 
+    // Check that the table corresponds to commitment
     hasher.out === tableCommit;
 
     component equalColumn[r][c];
@@ -37,7 +39,7 @@ template INSERT(c,r) {
     for (i=0; i<r; i++) {
         for (j=0; j<c; j++) {
             out[i][j] <== table[i][j];
-        }   
+        }
     }
 
     for (j=0; j<c; j++) {
