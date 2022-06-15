@@ -52,8 +52,10 @@ describe("zk-SQL", function () {
             header: header,
             table: table,
             tableCommit: tableHash,
-            whereColumn: [0, 2, 0, 0, 0],
-            whereValues: [0, 4, 0, 0, 0],
+            whereConditions: [
+                [[0,0], [2,4], [0,0], [0,0], [0,0]],
+                [[0,0], [0,0], [0,0], [0,0], [0,0]]
+            ],
             results: results,
         };
 
@@ -74,8 +76,58 @@ describe("zk-SQL", function () {
             header: header,
             table: table,
             tableCommit: tableHash,
-            whereColumn: [0, 2, 0, 4, 0],
-            whereValues: [0, 4, 0, 8, 0],
+            whereConditions: [
+                [[0,0], [2,4], [0,0], [4,8], [0,0]],
+                [[0,0], [0,0], [0,0], [0,0], [0,0]]
+            ],
+            results: results,
+        };
+
+        const witness = await selectCircuit.calculateWitness(INPUT, true);
+
+        assert(Fr.eq(Fr.e(witness[0]),Fr.e(1)));
+    });
+
+    it("SELECT * FROM table1 WHERE ('2' = 4 AND '4' = 8) OR ('4' = 4)", async () => {
+        const results = [
+            [1, 4, 3, 4, 3],
+            [0, 0, 0, 0, 0],
+            [3, 4, 5, 8, 4],
+            [0, 0, 0, 0, 0],
+            [5, 4, 7, 8, 9],
+        ]
+        const INPUT = {
+            header: header,
+            table: table,
+            tableCommit: tableHash,
+            whereConditions: [
+                [[0,0], [2,4], [0,0], [4,8], [0,0]],
+                [[0,0], [0,0], [0,0], [4,4], [0,0]]
+            ],
+            results: results,
+        };
+
+        const witness = await selectCircuit.calculateWitness(INPUT, true);
+
+        assert(Fr.eq(Fr.e(witness[0]),Fr.e(1)));
+    });
+
+    it("SELECT * FROM table1", async () => {
+        const results = [
+            [1, 4, 3, 4, 3],
+            [2, 3, 4, 3, 8],
+            [3, 4, 5, 8, 4],
+            [4, 5, 6, 7, 2],
+            [5, 4, 7, 8, 9],
+        ]
+        const INPUT = {
+            header: header,
+            table: table,
+            tableCommit: tableHash,
+            whereConditions: [
+                [[0,0], [0,0], [0,0], [0,0], [0,0]],
+                [[0,0], [0,0], [0,0], [0,0], [0,0]]
+            ],
             results: results,
         };
 

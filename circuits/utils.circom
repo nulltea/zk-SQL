@@ -70,3 +70,34 @@ template MultiSum(n, nops) {
     out <== b2n.out;
 }
 
+template IsNotZero() {
+    signal input in;
+    signal output out;
+
+    component inv = IsZero();
+    component not = NOT();
+
+    inv.in <== in;
+    not.in <== inv.out;
+
+    out <== not.out;
+}
+
+template MultiOR(n) {
+    signal input in[n];
+    signal output out;
+    component total;
+    component or;
+    if (n==1) {
+        out <== in[0];
+    } else {
+        total = CalculateTotal(n);
+        or = IsNotZero();
+        for (var i=0;i<n;i++) {
+            total.nums[i] <== in[i];
+        }
+
+        or.in <== total.sum;
+        out <== or.out;
+    }
+}

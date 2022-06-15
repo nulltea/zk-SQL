@@ -5,31 +5,31 @@ include "../node_modules/circomlib/circuits/gates.circom";
 include "./hashTable.circom";
 include "./utils.circom";
 
-template SELECT(c,r) {
-    signal input header[c];
-    signal input table[r][c];
+template SELECT(nColumns, nRows, nAND, nOR) {
+    signal input header[nColumns];
+    signal input table[nRows][nColumns];
     signal input tableCommit;
 
     // signal input fields[c];
-    signal input whereColumn[c];
-    signal input whereValues[c];
+    signal input whereConditions[nOR][nAND][2];
 
-    signal input results[r][c];
+    signal input results[nRows][nColumns];
 
-    signal output out[r][c];
+    signal output out[nRows][nColumns];
 
     var i;
     var j;
+    var k;
 
     // Hash table along with header
-    component hasher = HashTable(c,r);
+    component hasher = HashTable(nColumns,nRows);
 
-    for (i=0;i<c;i++) {
+    for (i=0;i<nColumns;i++) {
         hasher.header[i] <== header[i];
     }
 
-    for (i=0;i<r;i++) {
-        for (j=0;j<c;j++) {
+    for (i=0;i<nRows;i++) {
+        for (j=0;j<nColumns;j++) {
             hasher.table[i][j] <== table[i][j];
         }
     }
@@ -37,30 +37,39 @@ template SELECT(c,r) {
     // Check that the table corresponds to the commitment
     hasher.out === tableCommit;
 
-    component equalColumn[r][c];
-    component equalCell[r][c];
-    component filterRow[r];
+    component isFilterColumn[nRows][nOR][nColumns];
+    component equalCell[nRows][nOR][nColumns];
+    component filterRowAND[nRows][nOR];
+    component skipRowAND[nRows][nOR];
+    component filterRow[nRows];
 
-    for (i=0; i<r; i++) {
-        filterRow[i] = MultiAND(c);
+    for (i=0; i<nRows; i++) {
+        filterRow[i] = MultiOR(nOR);
+        for (k=0; k<nOR; k++) {
+            filterRowAND[i][k] = MultiAND(nAND);
+            skipRowAND[i][k] = MultiOR(nAND);
 
-        for (j=0; j<c; j++) {
-            equalColumn[i][j] = IsEqual();
-            equalColumn[i][j].in[0] <== header[j];
-            equalColumn[i][j].in[1] <== whereColumn[j];
+            for (j=0; j<nAND; j++) {
+                skipRowAND[i][k].in[j] <== whereConditions[k][j][0];
+                isFilterColumn[i][k][j] = IsEqual();
+                isFilterColumn[i][k][j].in[0] <== header[j];
+                isFilterColumn[i][k][j].in[1] <== whereConditions[k][j][0];
 
-            equalCell[i][j] = IsEqual();
-            equalCell[i][j].in[0] <== whereValues[j] * equalColumn[i][j].out;
-            equalCell[i][j].in[1] <== table[i][j] * equalColumn[i][j].out;
-            
-            filterRow[i].in[j] <== equalCell[i][j].out;
+                equalCell[i][k][j] = IsEqual();
+                equalCell[i][k][j].in[0] <== whereConditions[k][j][1] * isFilterColumn[i][k][j].out;
+                equalCell[i][k][j].in[1] <== table[i][j] * isFilterColumn[i][k][j].out;
+                
+                filterRowAND[i][k].in[j] <== equalCell[i][k][j].out;
+            }
+
+            filterRow[i].in[k] <== filterRowAND[i][k].out * skipRowAND[i][k].out;
         }
 
-        for (j=0; j<c; j++) {
+        for (j=0; j<nColumns; j++) {
             out[i][j] <== table[i][j] * filterRow[i].out;
             results[i][j] === out[i][j];
         }
     }
 }
 
-component main {public [tableCommit, whereColumn, whereValues, results]} = SELECT(5, 5);
+component main {public [tableCommit, whereConditions, results]} = SELECT(5, 5, 5, 2);
