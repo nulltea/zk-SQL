@@ -10,7 +10,7 @@ template SELECT(nColumns, nRows, nAND, nOR) {
     signal input table[nRows][nColumns];
     signal input tableCommit;
 
-    // signal input fields[c];
+    signal input fields[nColumns];
     signal input whereConditions[nOR][nAND][2];
 
     signal input results[nRows][nColumns];
@@ -40,17 +40,28 @@ template SELECT(nColumns, nRows, nAND, nOR) {
     component isFilterColumn[nRows][nOR][nColumns];
     component equalCell[nRows][nOR][nColumns];
     component filterRowAND[nRows][nOR];
-    component skipRowAND[nRows][nOR];
     component filterRow[nRows];
+    component skipORCond[nOR];
+    component skipAll = SumEquals(nOR);
+    signal isCell[nRows][nColumns];
+    skipAll.sum <== 0;
+
+    for (k=0; k<nOR; k++) {
+        skipORCond[k] = MultiOR(nAND);
+
+        for (j=0; j<nAND; j++) {
+            skipORCond[k].in[j] <== whereConditions[k][j][0];
+        }
+
+        skipAll.nums[k] <== skipORCond[k].out;
+    }
 
     for (i=0; i<nRows; i++) {
         filterRow[i] = MultiOR(nOR);
         for (k=0; k<nOR; k++) {
             filterRowAND[i][k] = MultiAND(nAND);
-            skipRowAND[i][k] = MultiOR(nAND);
 
             for (j=0; j<nAND; j++) {
-                skipRowAND[i][k].in[j] <== whereConditions[k][j][0];
                 isFilterColumn[i][k][j] = IsEqual();
                 isFilterColumn[i][k][j].in[0] <== header[j];
                 isFilterColumn[i][k][j].in[1] <== whereConditions[k][j][0];
@@ -62,14 +73,16 @@ template SELECT(nColumns, nRows, nAND, nOR) {
                 filterRowAND[i][k].in[j] <== equalCell[i][k][j].out;
             }
 
-            filterRow[i].in[k] <== filterRowAND[i][k].out * skipRowAND[i][k].out;
+            filterRow[i].in[k] <== filterRowAND[i][k].out * skipORCond[k].out + skipAll.out;
         }
 
         for (j=0; j<nColumns; j++) {
-            out[i][j] <== table[i][j] * filterRow[i].out;
+            assert(fields[j] >= 0 && fields[j] <= 1);
+            isCell[i][j] <== filterRow[i].out * fields[j];
+            out[i][j] <== table[i][j] * isCell[i][j];
             results[i][j] === out[i][j];
         }
     }
 }
 
-component main {public [tableCommit, whereConditions, results]} = SELECT(5, 5, 5, 2);
+component main {public [tableCommit, whereConditions, fields, results]} = SELECT(5, 5, 5, 2);

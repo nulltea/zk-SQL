@@ -21,6 +21,28 @@ template CalculateTotal(n) {
     sum <== sums[n - 1];
 }
 
+// This circuit returns the sum of the inputs.
+// n must be greater than 0.
+template SumEquals(n) {
+    signal input nums[n];
+    signal input sum;
+    signal output out;
+
+    signal sums[n];
+    sums[0] <== nums[0];
+
+    for (var i=1; i < n; i++) {
+        sums[i] <== sums[i - 1] + nums[i];
+    }
+
+    component isEqual = IsEqual();
+
+    isEqual.in[0] <== sums[n - 1];
+    isEqual.in[1] <== sum;
+
+    out <== isEqual.out;
+}
+
 template IsEqualWord(n) {
     signal input word[n];
     signal input test[n];
