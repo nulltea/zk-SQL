@@ -1,6 +1,8 @@
 pragma circom 2.0.0;
 
-include "../node_modules/circomlib/circuits/mimc.circom";
+include "../node_modules/circomlib/circuits/poseidon.circom";
+include "./utils.circom";
+
 
 template HashTable(c,r) {
     signal input header[c];
@@ -9,12 +11,13 @@ template HashTable(c,r) {
     signal output out;
 
     var n = c + (c * r);
-    component hasher = MultiMiMC7(n, 2);
-    hasher.k <== 1;
+
+    component preImage = CalculateTotal(n);
+    component hasher = Poseidon(1);
 
     var i;
     for (i=0;i<c;i++) {
-        hasher.in[i] <== header[i];
+        preImage.nums[i] <== header[i];
     }
 
     var j;
@@ -22,11 +25,11 @@ template HashTable(c,r) {
         for (j=0;j<c;j++) {
             // nColumns + current_row * nColumns + nCell;
             var idx = c+i*c+j;
-            hasher.in[idx] <== table[i][j];
+            preImage.nums[idx] <== table[i][j];
         }
     }
-
-    log(hasher.out);
+    
+    hasher.inputs[0] <== preImage.sum;
 
     out <== hasher.out;
 }

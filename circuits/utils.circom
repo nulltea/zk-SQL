@@ -5,14 +5,43 @@ include "../node_modules/circomlib/circuits/bitify.circom";
 include "../node_modules/circomlib/circuits/binsum.circom";
 include "../node_modules/circomlib/circuits/poseidon.circom";
 
-// template RowIndexOrLast(r) {
-//     signal input rowIndex;
-//     signal input condintion;
+// This circuit returns the sum of the inputs.
+// n must be greater than 0.
+template CalculateTotal(n) {
+    signal input nums[n];
+    signal output sum;
 
-//     signal output out;
+    signal sums[n];
+    sums[0] <== nums[0];
 
-//     out <== rowIndex * condintion + (r - 1) * (1 - condintion)
-// }
+    for (var i=1; i < n; i++) {
+        sums[i] <== sums[i - 1] + nums[i];
+    }
+
+    sum <== sums[n - 1];
+}
+
+// This circuit returns the sum of the inputs.
+// n must be greater than 0.
+template SumEquals(n) {
+    signal input nums[n];
+    signal input sum;
+    signal output out;
+
+    signal sums[n];
+    sums[0] <== nums[0];
+
+    for (var i=1; i < n; i++) {
+        sums[i] <== sums[i - 1] + nums[i];
+    }
+
+    component isEqual = IsEqual();
+
+    isEqual.in[0] <== sums[n - 1];
+    isEqual.in[1] <== sum;
+
+    out <== isEqual.out;
+}
 
 template IsEqualWord(n) {
     signal input word[n];
@@ -63,3 +92,34 @@ template MultiSum(n, nops) {
     out <== b2n.out;
 }
 
+template IsNotZero() {
+    signal input in;
+    signal output out;
+
+    component inv = IsZero();
+    component not = NOT();
+
+    inv.in <== in;
+    not.in <== inv.out;
+
+    out <== not.out;
+}
+
+template MultiOR(n) {
+    signal input in[n];
+    signal output out;
+    component total;
+    component or;
+    if (n==1) {
+        out <== in[0];
+    } else {
+        total = CalculateTotal(n);
+        or = IsNotZero();
+        for (var i=0;i<n;i++) {
+            total.nums[i] <== in[i];
+        }
+
+        or.in <== total.sum;
+        out <== or.out;
+    }
+}

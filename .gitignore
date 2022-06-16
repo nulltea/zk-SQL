@@ -14,7 +14,7 @@ artifacts
 *.r1cs
 *.ptau
 *.sym
-Q1/contracts/circuits/hitandblow_js
 verification_key.json
 verifier.sol
-Part1/contracts/circuits/MastermindVariation_js
+
+circuits/build
