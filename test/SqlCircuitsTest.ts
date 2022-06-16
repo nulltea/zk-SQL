@@ -6,6 +6,8 @@ const buildPoseidon = require("circomlibjs").buildPoseidon;
 exports.p = ff.Scalar.fromString("21888242871839275222246405745257275088548364400416034343698204186575808495617");
 const Fr = new ff.F1Field(exports.p);
 
+import { parseSelect } from "../utils/parser"
+
 describe("zk-SQL", () => {
     let selectCircuit: any;
     let insertCircuit: any;
@@ -34,6 +36,8 @@ describe("zk-SQL", () => {
 
         deleteCircuit = await wasm_tester("circuits/delete.circom")
         await deleteCircuit.loadConstraints();
+
+        parseSelect("SELECT * FROM table1 WHERE (2 = 4 AND 4 = 8) OR (4 = 4)", 5, 2);
     });
 
     it("SELECT * FROM table1 WHERE '2' = 4", async () => {
