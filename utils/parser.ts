@@ -1,4 +1,16 @@
 import {AST, Parser} from 'node-sql-parser/build/mysql'
+import exp = require("constants");
+
+export type ParserArgs = {
+    headerMap: Map<string, number>,
+    maxOR: number,
+    maxAND: number,
+}
+
+type SelectQuery = {
+    fields: number[],
+    whereConditions: number[][][]
+}
 
 class Condition {
     left: number;
@@ -28,23 +40,68 @@ class WhereCondition {
             this.conditions = inner;
         }
     }
+
+    public serialize(nAND: number, nOR: number): number[][][] {
+        let whereEncoded = [];
+        for (const andCond of this.conditions) {
+            let inner = [];
+            for (let i = 0; i < nAND; i++) {
+                let cond = andCond.conditions.find((c) => c.left == i + 1);
+                if (cond !== undefined) {
+                    inner.push([cond.left, cond.right]);
+                } else {
+                    inner.push([0,0])
+                }
+            }
+            whereEncoded.push(inner);
+        }
+
+        for (let i = 0; i < nOR - whereEncoded.length; i++) {
+            whereEncoded.push([...Array(nAND)].map(_ => [0, 0]));
+        }
+
+        return whereEncoded;
+    }
 }
 
-export function parseSelect(sql: string, nAND: number, nOR: number): any {
+export function parseSelect(sql: string, args: ParserArgs): SelectQuery {
     const parser = new Parser();
     let {ast} = parser.parse(sql);
-    let whereConditions: [][][2];
-    console.log(ast);
-    if ("where" in ast) {
-        let condition = parseWhere(ast.where);
-        console.log(condition);
+
+    let fields: number[] = [];
+
+    if ("columns" in ast) {
+        if (ast.columns === '*') {
+            fields = [...Array(args.headerMap.size)].map(_ => 1);
+        } else {
+            fields = [...Array(args.headerMap.size)].map(_ => 0)
+
+            ast.columns!.forEach((cRef) => {
+                let columnIdx = args.headerMap.get(cRef.expr.column);
+                if (columnIdx === undefined) {
+                    throw Error("unknown column");
+                }
+
+                fields[columnIdx - 1] = 1;
+            });
+        }
+    } else {
+        throw Error("select query must have columns")
     }
 
-    return []
+    let where = new WhereCondition();
+    if ("where" in ast && ast.where !== null) {
+        where = parseWhere(ast.where, args);
+    }
+
+    return {
+        fields: fields,
+        whereConditions: where.serialize(args.maxAND, args.maxOR)
+    }
 }
 
-function parseWhere(ast: any): WhereCondition {
-    let condition = parseCondition(ast);
+function parseWhere(ast: any, args: ParserArgs): WhereCondition {
+    let condition = parseCondition(ast, args);
 
     if (condition instanceof Condition) {
         return new WhereCondition(new ANDCondition(condition));
@@ -55,13 +112,12 @@ function parseWhere(ast: any): WhereCondition {
     return condition;
 }
 
-function parseCondition(ast: {operator: string, left: any, right: any}): WhereCondition | ANDCondition | Condition {
-    console.log(ast);
+function parseCondition(ast: {operator: string, left: any, right: any}, args: ParserArgs): WhereCondition | ANDCondition | Condition {
     switch (ast.operator) {
         case 'OR': {
             let condition = new WhereCondition();
-            let leftCondition =  parseCondition(ast.left);
-            let rightCondition =  parseCondition(ast.right);
+            let leftCondition =  parseCondition(ast.left, args);
+            let rightCondition =  parseCondition(ast.right, args);
 
             if (leftCondition instanceof Condition) {
                 condition.conditions.push(new ANDCondition(leftCondition));
@@ -72,7 +128,7 @@ function parseCondition(ast: {operator: string, left: any, right: any}): WhereCo
             }
 
             if (rightCondition instanceof Condition) {
-                condition.conditions[condition.conditions.length - 1].conditions.push(rightCondition);
+                condition.conditions.push(new ANDCondition(rightCondition));
             } else if (rightCondition instanceof ANDCondition) {
                 condition.conditions.push(rightCondition);
             } else {
@@ -80,16 +136,11 @@ function parseCondition(ast: {operator: string, left: any, right: any}): WhereCo
             }
 
             return condition;
-
-            break;
         }
         case 'AND': {
-            // WHERE x = 1 AND y = 2
             let condition = new ANDCondition();
-            let leftCondition =  parseCondition(ast.left);
-            let rightCondition =  parseCondition(ast.right);
-
-            console.log(leftCondition, rightCondition);
+            let leftCondition =  parseCondition(ast.left, args);
+            let rightCondition =  parseCondition(ast.right, args);
 
             if (leftCondition instanceof Condition) {
                 condition.conditions.push(leftCondition);
@@ -108,7 +159,12 @@ function parseCondition(ast: {operator: string, left: any, right: any}): WhereCo
             return condition;
         }
         case '=': {
-            return new Condition(1, 2);
+            let columnIdx = args.headerMap.get(ast.left.column);
+            if (columnIdx === undefined) {
+                throw Error("unknown column");
+            }
+
+            return new Condition(columnIdx, ast.right.value);
         }
     }
 

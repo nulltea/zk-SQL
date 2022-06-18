@@ -6,7 +6,7 @@ const buildPoseidon = require("circomlibjs").buildPoseidon;
 exports.p = ff.Scalar.fromString("21888242871839275222246405745257275088548364400416034343698204186575808495617");
 const Fr = new ff.F1Field(exports.p);
 
-import { parseSelect } from "../utils/parser"
+import {ParserArgs, parseSelect} from "../utils/parser"
 
 describe("zk-SQL", () => {
     let selectCircuit: any;
@@ -22,6 +22,12 @@ describe("zk-SQL", () => {
         [4, 5, 6, 7, 2],
         [5, 4, 7, 8, 9],
     ];
+    const parserArgs: ParserArgs = {
+        maxAND: 5, maxOR: 2,
+        headerMap: new Map<string, number>([
+            ["f1", 1], ["f2", 2], ["f3", 3], ["f4", 4], ["f5", 5],
+        ])
+    }
     const tableHash: bigint = 6192063684007625405622444875231245009508356906093894343979231563958794510376n;
 
     before(async () => {
@@ -36,11 +42,9 @@ describe("zk-SQL", () => {
 
         deleteCircuit = await wasm_tester("circuits/delete.circom")
         await deleteCircuit.loadConstraints();
-
-        parseSelect("SELECT * FROM table1 WHERE (2 = 4 AND 4 = 8) OR (4 = 4)", 5, 2);
     });
 
-    it("SELECT * FROM table1 WHERE '2' = 4", async () => {
+    it("SELECT * FROM table1 WHERE f2 = 4", async () => {
         const results = [
             [1, 4, 3, 4, 3],
             [0, 0, 0, 0, 0],
@@ -48,15 +52,15 @@ describe("zk-SQL", () => {
             [0, 0, 0, 0, 0],
             [5, 4, 7, 8, 9],
         ]
+
+        const parsed = parseSelect("SELECT * FROM table1 WHERE f2 = 4", parserArgs);
+
         const INPUT = {
             header: header,
             table: table,
             tableCommit: tableHash,
-            fields: [1, 1, 1, 1, 1],
-            whereConditions: [
-                [[0,0], [2,4], [0,0], [0,0], [0,0]],
-                [[0,0], [0,0], [0,0], [0,0], [0,0]]
-            ],
+            fields: parsed.fields,
+            whereConditions: parsed.whereConditions,
             results: results,
         };
 
@@ -65,7 +69,7 @@ describe("zk-SQL", () => {
         assert(Fr.eq(Fr.e(witness[0]),Fr.e(1)));
     });
 
-    it("SELECT '2', '3', '4' FROM table1 WHERE '2' = 4 AND '4' = 8", async () => {
+    it("SELECT f2, f3, f4 FROM table1 WHERE f2 = 4 AND f4 = 8", async () => {
         const results = [
             [0, 0, 0, 0, 0],
             [0, 0, 0, 0, 0],
@@ -73,15 +77,15 @@ describe("zk-SQL", () => {
             [0, 0, 0, 0, 0],
             [0, 4, 7, 8, 0],
         ]
+
+        const parsed = parseSelect("SELECT f2, f3, f4 FROM table1 WHERE f2 = 4 AND f4 = 8", parserArgs);
+
         const INPUT = {
             header: header,
             table: table,
             tableCommit: tableHash,
-            fields: [0, 1, 1, 1, 0],
-            whereConditions: [
-                [[0,0], [2,4], [0,0], [4,8], [0,0]],
-                [[0,0], [0,0], [0,0], [0,0], [0,0]]
-            ],
+            fields: parsed.fields,
+            whereConditions: parsed.whereConditions,
             results: results,
         };
 
@@ -90,23 +94,23 @@ describe("zk-SQL", () => {
         assert(Fr.eq(Fr.e(witness[0]),Fr.e(1)));
     });
 
-    it("SELECT * FROM table1 WHERE ('2' = 4 AND '4' = 8) OR ('4' = 4)", async () => {
+    it("SELECT * FROM table1 WHERE (f2 = 4 AND f4 = 8) OR (f4 = 4)", async () => {
         const results = [
             [1, 4, 3, 4, 3],
             [0, 0, 0, 0, 0],
             [3, 4, 5, 8, 4],
             [0, 0, 0, 0, 0],
             [5, 4, 7, 8, 9],
-        ]
+        ];
+
+        const parsed = parseSelect("SELECT * FROM table1 WHERE (f2 = 4 AND f4 = 8) OR (f4 = 4)", parserArgs);
+
         const INPUT = {
             header: header,
             table: table,
             tableCommit: tableHash,
-            fields: [1, 1, 1, 1, 1],
-            whereConditions: [
-                [[0,0], [2,4], [0,0], [4,8], [0,0]],
-                [[0,0], [0,0], [0,0], [4,4], [0,0]]
-            ],
+            fields: parsed.fields,
+            whereConditions: parsed.whereConditions,
             results: results,
         };
 
@@ -122,15 +126,16 @@ describe("zk-SQL", () => {
             [3, 4, 5, 8, 4],
             [4, 5, 6, 7, 2],
             [5, 4, 7, 8, 9],
-        ]
+        ];
+
+        const parsed = parseSelect("SELECT * FROM table1", parserArgs);
+
         const INPUT = {
             header: header,
             table: table,
             tableCommit: tableHash,
-            whereConditions: [
-                [[0,0], [0,0], [0,0], [0,0], [0,0]],
-                [[0,0], [0,0], [0,0], [0,0], [0,0]]
-            ],
+            fields: parsed.fields,
+            whereConditions: parsed.whereConditions,
             results: results,
         };
 
