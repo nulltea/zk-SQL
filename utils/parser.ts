@@ -12,6 +12,10 @@ type SelectQuery = {
     whereConditions: number[][][]
 }
 
+type DeleteQuery = {
+    whereConditions: number[][][]
+}
+
 class Condition {
     left: number;
     right: number;
@@ -96,6 +100,20 @@ export function parseSelect(sql: string, args: ParserArgs): SelectQuery {
 
     return {
         fields: fields,
+        whereConditions: where.serialize(args.maxAND, args.maxOR)
+    }
+}
+
+export function parseDelete(sql: string, args: ParserArgs): DeleteQuery {
+    const parser = new Parser();
+    let {ast} = parser.parse(sql);
+
+    let where = new WhereCondition();
+    if ("where" in ast && ast.where !== null) {
+        where = parseWhere(ast.where, args);
+    }
+
+    return {
         whereConditions: where.serialize(args.maxAND, args.maxOR)
     }
 }
