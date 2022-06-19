@@ -6,7 +6,7 @@ const buildPoseidon = require("circomlibjs").buildPoseidon;
 exports.p = ff.Scalar.fromString("21888242871839275222246405745257275088548364400416034343698204186575808495617");
 const Fr = new ff.F1Field(exports.p);
 
-import {ParserArgs, parseSelect, parseDelete} from "../utils/parser"
+import {ParserArgs, parseSelect, parseInsert, parseUpdate, parseDelete} from "../utils/parser"
 
 describe("zk-SQL", () => {
     let selectCircuit: any;
@@ -144,31 +144,31 @@ describe("zk-SQL", () => {
         assert(Fr.eq(Fr.e(witness[0]),Fr.e(1)));
     });
 
-    it("INSERT INTO table1 VALUES (...)", async () => {
+    it("INSERT INTO table1 VALUES (1, 2, 3, 4, 5)", async () => {
+        const parsed = parseInsert("INSERT INTO table1 VALUES (1, 2, 3, 4, 5)", parserArgs);
         const INPUT = {
             header: header,
             table: table,
             tableCommit: tableHash,
-            insertRow: [1, 2, 3, 4, 5],
+            insertValues: parsed.insertValues,
         };
         const witness = await insertCircuit.calculateWitness(INPUT, true);
 
-        const resultTable = table.concat([INPUT.insertRow]);
+        const resultTable = table.concat([INPUT.insertValues]);
         const newTableHash = await hashTable(header, resultTable);
 
         assert(Fr.eq(Fr.e(witness[0]),Fr.e(1)));
         assert(Fr.eq(Fr.e(witness[1]),Fr.e(newTableHash)), "must produce same hash");
     });
 
-    it("UPDATE table1 SET (...) WHERE '2' = 4", async () => {
+    it("UPDATE table1 SET f1=8, f3=8, f4=8, f5=8 WHERE f2 = 4", async () => {
+        const parsed = parseUpdate("UPDATE table1 SET f1=8, f3=8, f4=8, f5=8 WHERE f2 = 4", parserArgs);
         const INPUT = {
             header: header,
             table: table,
             tableCommit: tableHash,
-            whereColumn: [0, 2, 0, 0, 0],
-            whereValues: [0, 4, 0, 0, 0],
-            setFields: [1, 0, 3, 4, 5],
-            setValues: [8, 0, 8, 8, 8],
+            whereConditions: parsed.whereConditions,
+            setExpressions: parsed.setExpressions,
         };
 
         const witness = await updateCircuit.calculateWitness(INPUT, true);

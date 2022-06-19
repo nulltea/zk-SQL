@@ -12,6 +12,15 @@ type SelectQuery = {
     whereConditions: number[][][]
 }
 
+type InsertQuery = {
+    insertValues: number[]
+}
+
+type UpdateQuery = {
+    setExpressions: number[][],
+    whereConditions: number[][][]
+}
+
 type DeleteQuery = {
     whereConditions: number[][][]
 }
@@ -100,6 +109,51 @@ export function parseSelect(sql: string, args: ParserArgs): SelectQuery {
 
     return {
         fields: fields,
+        whereConditions: where.serialize(args.maxAND, args.maxOR)
+    }
+}
+
+export function parseInsert(sql: string, args: ParserArgs): InsertQuery {
+    const parser = new Parser();
+    let {ast} = parser.parse(sql);
+
+
+    if ("values" in ast && ast.values !== null && Array.isArray(ast.values)) {
+        return {
+            insertValues: ast.values[0].value.map((e) => "value" in e && typeof e.value === "number" ? e.value: 0)
+        }
+    }
+
+    throw Error("unsupported values expression");
+}
+
+export function parseUpdate(sql: string, args: ParserArgs): UpdateQuery {
+    const parser = new Parser();
+    let {ast} = parser.parse(sql);
+
+    let where = new WhereCondition();
+    if ("where" in ast && ast.where !== null) {
+        where = parseWhere(ast.where, args);
+    }
+
+    let setExpressions = [];
+    if ("set" in ast && ast.set !== null) {
+        for (let i = 0; i < args.headerMap.size; i++) {
+            let cond = ast.set.find((c) => args.headerMap.get(c.column) == i + 1);
+            if (cond !== undefined) {
+                if ("value" in cond) {
+                    setExpressions.push([i + 1, cond.value.value]);
+                } else {
+                    throw Error("unsupported set value");
+                }
+            } else {
+                setExpressions.push([0,0])
+            }
+        }
+    }
+
+    return {
+        setExpressions: setExpressions,
         whereConditions: where.serialize(args.maxAND, args.maxOR)
     }
 }
