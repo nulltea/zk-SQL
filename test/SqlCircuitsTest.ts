@@ -6,13 +6,16 @@ const buildPoseidon = require("circomlibjs").buildPoseidon;
 exports.p = ff.Scalar.fromString("21888242871839275222246405745257275088548364400416034343698204186575808495617");
 const Fr = new ff.F1Field(exports.p);
 
-import {ParserArgs, parseSelect, parseInsert, parseUpdate, parseDelete} from "../utils/parser"
+import {ParserArgs, parseSelect, parseInsert, parseUpdate, parseDelete} from "../src/parser"
+import initSqlJs, {Database, SqlJsStatic} from "sql.js";
+import {execSqlQuery} from "../src/engine";
 
 describe("zk-SQL", () => {
     let selectCircuit: any;
     let insertCircuit: any;
     let updateCircuit: any;
     let deleteCircuit: any;
+    let db: Database;
     // List of valid words to assert during circuit compile, must be agreed before game.
     const header = [1, 2, 3, 4, 5];
     const table = [
@@ -23,7 +26,7 @@ describe("zk-SQL", () => {
         [5, 4, 7, 8, 9],
     ];
     const parserArgs: ParserArgs = {
-        maxAND: 5, maxOR: 2,
+        maxAND: 5, maxOR: 2, maxRows: 5,
         headerMap: new Map<string, number>([
             ["f1", 1], ["f2", 2], ["f3", 3], ["f4", 4], ["f5", 5],
         ])
@@ -42,103 +45,41 @@ describe("zk-SQL", () => {
 
         deleteCircuit = await wasm_tester("circuits/delete.circom")
         await deleteCircuit.loadConstraints();
+
+        let SQL = await initSqlJs({
+            locateFile: _ => `./node_modules/sql.js/dist/sql-wasm.wasm`
+        });
+
+        db = new SQL.Database();
+        db.run("CREATE TABLE table1 (id INTEGER PRIMARY KEY AUTOINCREMENT, f1 int, f2 int, f3 int, f4 int, f5 int)");
+        table.forEach((row) => {
+            db.run(`INSERT INTO table1 (f1, f2, f3, f4, f5) VALUES (${row.join(", ")})`);
+        });
     });
 
     it("SELECT * FROM table1 WHERE f2 = 4", async () => {
-        const results = [
-            [1, 4, 3, 4, 3],
-            [0, 0, 0, 0, 0],
-            [3, 4, 5, 8, 4],
-            [0, 0, 0, 0, 0],
-            [5, 4, 7, 8, 9],
-        ]
-
-        const parsed = parseSelect("SELECT * FROM table1 WHERE f2 = 4", parserArgs);
-
-        const INPUT = {
-            header: header,
-            table: table,
-            tableCommit: tableHash,
-            fields: parsed.fields,
-            whereConditions: parsed.whereConditions,
-            results: results,
-        };
-
+        const INPUT = await execSqlQuery(db, "SELECT * FROM table1 WHERE f2 = 4", parserArgs);
         const witness = await selectCircuit.calculateWitness(INPUT, true);
 
         assert(Fr.eq(Fr.e(witness[0]),Fr.e(1)));
     });
 
     it("SELECT f2, f3, f4 FROM table1 WHERE f2 = 4 AND f4 = 8", async () => {
-        const results = [
-            [0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0],
-            [0, 4, 5, 8, 0],
-            [0, 0, 0, 0, 0],
-            [0, 4, 7, 8, 0],
-        ]
-
-        const parsed = parseSelect("SELECT f2, f3, f4 FROM table1 WHERE f2 = 4 AND f4 = 8", parserArgs);
-
-        const INPUT = {
-            header: header,
-            table: table,
-            tableCommit: tableHash,
-            fields: parsed.fields,
-            whereConditions: parsed.whereConditions,
-            results: results,
-        };
-
+        const INPUT = await execSqlQuery(db, "SELECT f2, f3, f4 FROM table1 WHERE f2 = 4 AND f4 = 8", parserArgs);
         const witness = await selectCircuit.calculateWitness(INPUT, true);
 
         assert(Fr.eq(Fr.e(witness[0]),Fr.e(1)));
     });
 
     it("SELECT * FROM table1 WHERE (f2 = 4 AND f4 = 8) OR (f4 = 4)", async () => {
-        const results = [
-            [1, 4, 3, 4, 3],
-            [0, 0, 0, 0, 0],
-            [3, 4, 5, 8, 4],
-            [0, 0, 0, 0, 0],
-            [5, 4, 7, 8, 9],
-        ];
-
-        const parsed = parseSelect("SELECT * FROM table1 WHERE (f2 = 4 AND f4 = 8) OR (f4 = 4)", parserArgs);
-
-        const INPUT = {
-            header: header,
-            table: table,
-            tableCommit: tableHash,
-            fields: parsed.fields,
-            whereConditions: parsed.whereConditions,
-            results: results,
-        };
-
+        const INPUT = await execSqlQuery(db, "SELECT * FROM table1 WHERE (f2 = 4 AND f4 = 8) OR (f4 = 4)", parserArgs);
         const witness = await selectCircuit.calculateWitness(INPUT, true);
 
         assert(Fr.eq(Fr.e(witness[0]),Fr.e(1)));
     });
 
     it("SELECT * FROM table1", async () => {
-        const results = [
-            [1, 4, 3, 4, 3],
-            [2, 3, 4, 3, 8],
-            [3, 4, 5, 8, 4],
-            [4, 5, 6, 7, 2],
-            [5, 4, 7, 8, 9],
-        ];
-
-        const parsed = parseSelect("SELECT * FROM table1", parserArgs);
-
-        const INPUT = {
-            header: header,
-            table: table,
-            tableCommit: tableHash,
-            fields: parsed.fields,
-            whereConditions: parsed.whereConditions,
-            results: results,
-        };
-
+        const INPUT = await execSqlQuery(db, "SELECT * FROM table1", parserArgs);
         const witness = await selectCircuit.calculateWitness(INPUT, true);
 
         assert(Fr.eq(Fr.e(witness[0]),Fr.e(1)));

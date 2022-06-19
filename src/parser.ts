@@ -5,6 +5,7 @@ export type ParserArgs = {
     headerMap: Map<string, number>,
     maxOR: number,
     maxAND: number,
+    maxRows: number,
 }
 
 type SelectQuery = {
