@@ -18,3 +18,4 @@ verification_key.json
 verifier.sol
 
 circuits/build
+typechain-types

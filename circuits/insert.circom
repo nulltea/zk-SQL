@@ -13,7 +13,7 @@ template INSERT(c,r) {
     signal input insertValues[c];
     
     signal output newTableCommit;
-    signal output out[r+1][c];
+    signal out[r+1][c];
 
     var i;
     var j;

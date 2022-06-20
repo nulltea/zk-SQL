@@ -5,12 +5,12 @@ const ff = require("ffjavascript");
 const buildPoseidon = require("circomlibjs").buildPoseidon;
 exports.p = ff.Scalar.fromString("21888242871839275222246405745257275088548364400416034343698204186575808495617");
 const Fr = new ff.F1Field(exports.p);
-
+const {plonk} = require("snarkjs");
 import {ParserArgs, parseSelect, parseInsert, parseUpdate, parseDelete} from "../src/parser"
 import initSqlJs, {Database, SqlJsStatic} from "sql.js";
 import {execSqlQuery} from "../src/engine";
 
-describe("zk-SQL", () => {
+describe("zk-SQL - Circuits", () => {
     let selectCircuit: any;
     let insertCircuit: any;
     let updateCircuit: any;
@@ -134,3 +134,5 @@ async function hashTable(header: number[], table: any) {
     let preImage = flatTable.reduce((sum, x) => sum + x, 0);
     return poseidon.F.toObject(poseidon([preImage]));
 }
+
+

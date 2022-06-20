@@ -3,6 +3,7 @@
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.5",
     "@nomiclabs/hardhat-waffle": "^2.0.3",
+    "@typechain/hardhat": "^6.1.2",
     "@types/chai": "^4.3.1",
     "@types/mocha": "^9.1.1",
     "@types/node": "^18.0.0",
@@ -22,6 +23,7 @@
     "jest": "^28.1.1",
     "jest-extended": "^2.0.0",
     "node-sql-parser": "^4.3.0",
+    "snarkjs": "^0.4.22",
     "sql.js": "^1.7.0"
   }
 }
