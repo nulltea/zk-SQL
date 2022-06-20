@@ -5,30 +5,29 @@ include "../node_modules/circomlib/circuits/gates.circom";
 include "./hashTable.circom";
 include "./utils.circom";
 
-template DELETE(c,r) {
-    signal input header[c];
-    signal input table[r][c];
+template DELETE(nColumns,nRows,nAND,nOR) {
+    signal input header[nColumns];
+    signal input table[nRows][nColumns];
     signal input tableCommit;
 
-    // signal input fields[c];
-    signal input whereColumn[c];
-    signal input whereValues[c];
+    signal input whereConditions[nOR][nAND][2];
 
     signal output newTableCommit;
-    signal output out[r][c];
+    signal output out[nRows][nColumns];
 
     var i;
     var j;
+    var k;
 
     // Hash table along with header
-    component hasher = HashTable(c,r);
+    component hasher = HashTable(nColumns,nRows);
 
-    for (i=0;i<c;i++) {
+    for (i=0;i<nColumns;i++) {
         hasher.header[i] <== header[i];
     }
 
-    for (i=0;i<r;i++) {
-        for (j=0;j<c;j++) {
+    for (i=0;i<nRows;i++) {
+        for (j=0;j<nColumns;j++) {
             hasher.table[i][j] <== table[i][j];
         }
     }
@@ -36,39 +35,49 @@ template DELETE(c,r) {
     // Check that the table corresponds to the commitment
     hasher.out === tableCommit;
 
-    component equalColumn[r][c];
-    component equalCell[r][c];
-    component filterRow[r];
-    component rowsToDelete[r];
+    component isFilterColumn[nRows][nOR][nColumns];
+    component equalCell[nRows][nOR][nColumns];
+    component filterRowAND[nRows][nOR];
+    component filterRow[nRows];
+    component skipORCond[nOR];
+    component skipAll = SumEquals(nOR);
+    component rowsToDelete[nRows];
+    skipAll.sum <== 0;
 
-    for (i=0; i<r; i++) {
-        filterRow[i] = MultiAND(c);
+    for (k=0; k<nOR; k++) {
+        skipORCond[k] = MultiOR(nAND);
 
-        for (j=0; j<c; j++) {
-            equalColumn[i][j] = IsEqual();
-            equalColumn[i][j].in[0] <== header[j];
-            equalColumn[i][j].in[1] <== whereColumn[j];
-
-            equalCell[i][j] = IsEqual();
-            equalCell[i][j].in[0] <== whereValues[j] * equalColumn[i][j].out;
-            equalCell[i][j].in[1] <== table[i][j] * equalColumn[i][j].out;
-            
-            filterRow[i].in[j] <== equalCell[i][j].out;
+        for (j=0; j<nAND; j++) {
+            skipORCond[k].in[j] <== whereConditions[k][j][0];
         }
 
-        // TODO: find a way to skip rows without "Non-quadratic constraint"
-        // if (filterRow[i].out == 1) {
-        //     rowIdx++;
-        // }
-        // out[rowIdx][j] <== this won't work
-        //
-        // It might be possible to do something like `QuinSelector` but it won't be optimal.
-        // For now "skipped" rows will be zeroed, so it won't affect summed preimage and hash commitment.
+        skipAll.nums[k] <== skipORCond[k].out;
+    }
+
+    for (i=0; i<nRows; i++) {
+        filterRow[i] = MultiOR(nOR);
+        for (k=0; k<nOR; k++) {
+            filterRowAND[i][k] = MultiAND(nAND);
+
+            for (j=0; j<nAND; j++) {
+                isFilterColumn[i][k][j] = IsEqual();
+                isFilterColumn[i][k][j].in[0] <== header[j];
+                isFilterColumn[i][k][j].in[1] <== whereConditions[k][j][0];
+
+                equalCell[i][k][j] = IsEqual();
+                equalCell[i][k][j].in[0] <== whereConditions[k][j][1] * isFilterColumn[i][k][j].out;
+                equalCell[i][k][j].in[1] <== table[i][j] * isFilterColumn[i][k][j].out;
+                
+                filterRowAND[i][k].in[j] <== equalCell[i][k][j].out;
+            }
+
+            filterRow[i].in[k] <== filterRowAND[i][k].out * skipORCond[k].out + skipAll.out;
+        }
 
         rowsToDelete[i] = NOT();
         rowsToDelete[i].in <== filterRow[i].out;
 
-        for (j=0; j<c; j++) {
+        for (j=0; j<nColumns; j++) {
             out[i][j] <== table[i][j] * rowsToDelete[i].out;
         }
     }
@@ -76,14 +85,14 @@ template DELETE(c,r) {
     // TODO: replace code above with SELECT component.
 
     // Hash table and header again to produce new commitment.
-    component newHasher = HashTable(c,r);
+    component newHasher = HashTable(nColumns,nRows);
 
-    for (i=0;i<c;i++) {
+    for (i=0;i<nColumns;i++) {
         newHasher.header[i] <== header[i];
     }
 
-    for (i=0;i<r;i++) {
-        for (j=0;j<c;j++) {
+    for (i=0;i<nRows;i++) {
+        for (j=0;j<nColumns;j++) {
             newHasher.table[i][j] <== out[i][j];
         }
     }
@@ -91,4 +100,4 @@ template DELETE(c,r) {
     newTableCommit <== newHasher.out;
 }
 
-component main {public [tableCommit, whereColumn, whereValues]} = DELETE(5, 5);
+component main {public [tableCommit, whereConditions]} = DELETE(5, 5, 5, 2);

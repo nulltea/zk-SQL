@@ -10,7 +10,7 @@ template INSERT(c,r) {
     signal input table[r][c];
     signal input tableCommit;
 
-    signal input insertRow[c];
+    signal input insertValues[c];
     
     signal output newTableCommit;
     signal output out[r+1][c];
@@ -44,7 +44,7 @@ template INSERT(c,r) {
     }
 
     for (j=0; j<c; j++) {
-        out[r][j] <== insertRow[j];
+        out[r][j] <== insertValues[j];
     }
 
     // Hash table and header again to produce new commitment.
@@ -63,4 +63,4 @@ template INSERT(c,r) {
     newTableCommit <== newHasher.out;
 }
 
-component main {public [tableCommit, insertRow]} = INSERT(5, 5);
+component main {public [tableCommit, insertValues]} = INSERT(5, 5);
