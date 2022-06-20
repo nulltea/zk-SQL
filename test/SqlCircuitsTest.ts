@@ -86,16 +86,10 @@ describe("zk-SQL", () => {
     });
 
     it("INSERT INTO table1 VALUES (1, 2, 3, 4, 5)", async () => {
-        const parsed = parseInsert("INSERT INTO table1 VALUES (1, 2, 3, 4, 5)", parserArgs);
-        const INPUT = {
-            header: header,
-            table: table,
-            tableCommit: tableHash,
-            insertValues: parsed.insertValues,
-        };
+        const INPUT = await execSqlQuery(db, "INSERT INTO table1 VALUES (1, 2, 3, 4, 5)", parserArgs);
         const witness = await insertCircuit.calculateWitness(INPUT, true);
 
-        const resultTable = table.concat([INPUT.insertValues]);
+        const resultTable = table.concat([1, 2, 3, 4, 5]);
         const newTableHash = await hashTable(header, resultTable);
 
         assert(Fr.eq(Fr.e(witness[0]),Fr.e(1)));
@@ -103,15 +97,7 @@ describe("zk-SQL", () => {
     });
 
     it("UPDATE table1 SET f1=8, f3=8, f4=8, f5=8 WHERE f2 = 4", async () => {
-        const parsed = parseUpdate("UPDATE table1 SET f1=8, f3=8, f4=8, f5=8 WHERE f2 = 4", parserArgs);
-        const INPUT = {
-            header: header,
-            table: table,
-            tableCommit: tableHash,
-            whereConditions: parsed.whereConditions,
-            setExpressions: parsed.setExpressions,
-        };
-
+        const INPUT = await execSqlQuery(db, "UPDATE table1 SET f1=8, f3=8, f4=8, f5=8 WHERE f2 = 4", parserArgs);
         const witness = await updateCircuit.calculateWitness(INPUT, true);
 
         const results = [
@@ -128,15 +114,7 @@ describe("zk-SQL", () => {
     });
 
     it("DELETE FROM table1 WHERE f2 = 4", async () => {
-        const parsed = parseDelete("DELETE FROM table1 WHERE f2 = 4", parserArgs);
-
-        const INPUT = {
-            header: header,
-            table: table,
-            tableCommit: tableHash,
-            whereConditions: parsed.whereConditions
-        };
-
+        const INPUT = await execSqlQuery(db, "DELETE FROM table1 WHERE f2 = 4", parserArgs);
         const witness = await deleteCircuit.calculateWitness(INPUT, true);
 
         const results = [
