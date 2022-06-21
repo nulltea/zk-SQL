@@ -17,6 +17,7 @@ type InsertCircuitInputs = {
     table: number[][],
     tableCommit: bigint,
     insertValues: number[],
+    argsCommit: bigint,
 }
 
 type UpdateCircuitInputs = {
@@ -25,6 +26,7 @@ type UpdateCircuitInputs = {
     tableCommit: bigint,
     whereConditions: number[][][],
     setExpressions: number[][],
+    argsCommit: bigint,
 }
 
 type DeleteCircuitInputs = {
@@ -32,10 +34,11 @@ type DeleteCircuitInputs = {
     table: number[][],
     tableCommit: bigint,
     whereConditions: number[][][],
+    argsCommit: bigint,
 }
 
 // this should be replaced by on-chain request
-const tableCommitments = new Map<string, bigint>([
+export const tableCommitments = new Map<string, bigint>([
     ["table1", 6192063684007625405622444875231245009508356906093894343979231563958794510376n]
 ])
 
@@ -79,15 +82,18 @@ export async function execSqlQuery(db: Database, query: string, args: ParserArgs
             }
         case "insert":
             const insertParsed = parseInsert(query, args);
+            db.run(query);
 
             return {
                 header: tableHeader,
                 table: formatTable(tableState.columns, tableState.values, args),
                 tableCommit: tableCommitments.get(tableName)!,
-                insertValues: insertParsed.insertValues
+                insertValues: insertParsed.insertValues,
+                argsCommit: await commitToQuery(query, args),
             }
         case "update":
             const updParsed = parseUpdate(query, args);
+            db.run(query);
 
             return {
                 header: tableHeader,
@@ -95,16 +101,56 @@ export async function execSqlQuery(db: Database, query: string, args: ParserArgs
                 tableCommit: tableCommitments.get(tableName)!,
                 whereConditions: updParsed.whereConditions,
                 setExpressions: updParsed.setExpressions,
+                argsCommit: await commitToQuery(query, args),
             }
         case "delete":
             const delParsed = parseDelete(query, args);
+            db.run(query);
 
             return {
                 header: tableHeader,
                 table: formatTable(tableState.columns, tableState.values, args),
                 tableCommit: tableCommitments.get(tableName)!,
                 whereConditions: delParsed.whereConditions,
+                argsCommit: await commitToQuery(query, args),
             }
+    }
+
+    throw Error("unsupported query");
+}
+
+export async function commitToQuery(query: string, args: ParserArgs): Promise<bigint>
+{
+    const parser = new Parser();
+    let {ast} = parser.parse(query)
+
+    if (!("type" in ast)) {
+        throw Error("bad query");
+    }
+
+
+    const tableName = parseTableName(ast);
+    if (tableName == null) {
+        throw Error("bad query: unknown table");
+    }
+
+    const poseidon = await buildPoseidon();
+
+    switch (ast.type) {
+        case "insert":
+            const insertParsed = parseInsert(query, args);
+            return poseidon.F.toObject(poseidon(insertParsed.insertValues));
+        case "update":
+            const updParsed = parseUpdate(query, args);
+            let flatExpressions = updParsed.setExpressions.flat();
+            flatExpressions = flatExpressions.concat(...updParsed.whereConditions.flat());
+            let updPreImage = flatExpressions.reduce((sum, x) => sum + x, 0);
+            return poseidon.F.toObject(poseidon([updPreImage]));
+        case "delete":
+            const delParsed = parseDelete(query, args);
+            let delPreImage = delParsed.whereConditions.flat(2).reduce((sum, x) => sum + x, 0);
+
+            return poseidon.F.toObject(poseidon([delPreImage]));
     }
 
     throw Error("unsupported query");
@@ -142,11 +188,4 @@ function formatTable(columns: string[], values: SqlValue[][], args: ParserArgs):
     }
 
     return formatted;
-}
-
-async function hashTable(header: number[], table: any) {
-    const poseidon = await buildPoseidon();
-    let flatTable = [].concat.apply(header, table);
-    let preImage = flatTable.reduce((sum, x) => sum + x, 0);
-    return poseidon.F.toObject(poseidon([preImage]));
 }

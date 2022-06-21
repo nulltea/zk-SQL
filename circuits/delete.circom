@@ -11,13 +11,29 @@ template DELETE(nColumns,nRows,nAND,nOR) {
     signal input tableCommit;
 
     signal input whereConditions[nOR][nAND][2];
+    signal input argsCommit;
 
     signal output newTableCommit;
-    signal output out[nRows][nColumns];
+    signal modified[nRows][nColumns];
 
     var i;
     var j;
     var k;
+
+    // Hash arguments
+    component preImage = CalculateTotal(nOR*nAND*2);
+    component argsHasher = Poseidon(1);
+
+    for (i=0;i<nOR;i++) {
+        for (j=0;j<nAND;j++) {
+            var idx = i*nAND*2+j*2;
+            preImage.nums[idx] <== whereConditions[i][j][0];
+            preImage.nums[idx+1] <== whereConditions[i][j][1];
+        }
+    }
+    
+    argsHasher.inputs[0] <== preImage.sum;
+    argsHasher.out === argsCommit;
 
     // Hash table along with header
     component hasher = HashTable(nColumns,nRows);
@@ -78,7 +94,7 @@ template DELETE(nColumns,nRows,nAND,nOR) {
         rowsToDelete[i].in <== filterRow[i].out;
 
         for (j=0; j<nColumns; j++) {
-            out[i][j] <== table[i][j] * rowsToDelete[i].out;
+            modified[i][j] <== table[i][j] * rowsToDelete[i].out;
         }
     }
 
@@ -93,11 +109,11 @@ template DELETE(nColumns,nRows,nAND,nOR) {
 
     for (i=0;i<nRows;i++) {
         for (j=0;j<nColumns;j++) {
-            newHasher.table[i][j] <== out[i][j];
+            newHasher.table[i][j] <== modified[i][j];
         }
     }
 
     newTableCommit <== newHasher.out;
 }
 
-component main {public [tableCommit, whereConditions]} = DELETE(5, 5, 5, 2);
+component main {public [tableCommit, argsCommit]} = DELETE(5, 6, 5, 2);

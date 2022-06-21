@@ -3,12 +3,17 @@ import { ethers } from "hardhat";
 const {plonk} = require("snarkjs");
 import {ParserArgs, parseSelect, parseInsert, parseUpdate, parseDelete} from "../src/parser"
 import initSqlJs, {Database, SqlJsStatic} from "sql.js";
-import {execSqlQuery} from "../src/engine";
-import {ZkSQL} from "../typechain-types";
+import {commitToQuery, execSqlQuery, tableCommitments} from "../src/engine";
+import {ZkSQL, } from "../typechain-types/zkSQL.sol";
 import {PlonkVerifier as InsertVerifier} from "../typechain-types/insertVerifier.sol";
+import {PlonkVerifier as UpdateVerifier} from "../typechain-types/updateVerifier.sol";
+import {PlonkVerifier as DeleteVerifier} from "../typechain-types/deleteVerifier.sol";
+
 
 describe("zk-SQL - Contracts", () => {
     let insertVerifier: InsertVerifier;
+    let updateVerifier: UpdateVerifier;
+    let deleteVerifier: DeleteVerifier;
     let zkSQL: ZkSQL;
     let db: Database;
     // List of valid words to assert during circuit compile, must be agreed before game.
@@ -33,8 +38,16 @@ describe("zk-SQL - Contracts", () => {
         insertVerifier = await insertFactory.deploy() as InsertVerifier;
         await insertVerifier.deployed();
 
+        let updateFactory = await ethers.getContractFactory("contracts/updateVerifier.sol:PlonkVerifier");
+        updateVerifier = await updateFactory.deploy() as UpdateVerifier;
+        await updateVerifier.deployed();
+
+        let deleteFactory = await ethers.getContractFactory("contracts/deleteVerifier.sol:PlonkVerifier");
+        deleteVerifier = await deleteFactory.deploy() as DeleteVerifier;
+        await deleteVerifier.deployed();
+
         let zkSqlFactory = await ethers.getContractFactory("contracts/zkSQL.sol:ZkSQL");
-        zkSQL = await zkSqlFactory.deploy(insertVerifier.address) as ZkSQL;
+        zkSQL = await zkSqlFactory.deploy(insertVerifier.address, updateVerifier.address, deleteVerifier.address) as ZkSQL;
         await zkSQL.deployed();
 
         let SQL = await initSqlJs({
@@ -48,24 +61,72 @@ describe("zk-SQL - Contracts", () => {
         });
     });
 
-    it("Insert contract call", async () => {
-        const INPUT = await execSqlQuery(db, "INSERT INTO table1 VALUES (1, 2, 3, 4, 5)", parserArgs);
-        const { proof, publicSignals } = await plonk.fullProve(
+    it("INSERT INTO table1 VALUES (1, 2, 3, 4, 5)", async () => {
+        const query = "INSERT INTO table1 (f1, f2, f3, f4, f5) VALUES (1, 2, 3, 4, 5)";
+        const argsCommit = await commitToQuery(query, parserArgs);
+        await zkSQL.request("table1", argsCommit);
+
+        const INPUT = await execSqlQuery(db, query, parserArgs);
+        const { proof, newTableCommit } = await unpackProof(plonk.fullProve(
             INPUT,
             "circuits/build/insert/insert_js/insert.wasm",
             "circuits/build/insert/circuit_final.zkey"
-        );
+        ));
 
-        const editedPublicSignals = unstringifyBigInts(publicSignals);
-        const editedProof = unstringifyBigInts(proof);
-        const calldata = await plonk.exportSolidityCallData(editedProof, editedPublicSignals);
-        const argv = calldata.replace(/["[\]\s]/g, "").split(',').map((x: string) => BigInt(x));
-        let p = ethers.utils.arrayify(ethers.utils.hexlify(argv[0]));
-        let newTableCommit = argv[1];
-        await zkSQL.insert("table1", [1, 2, 3, 4, 5], newTableCommit, p);
-        console.assert(await zkSQL.tableCommitments("table1") == newTableCommit.toString(), "Should update table commitment");
+        await zkSQL.execRequest(0, argsCommit, newTableCommit, proof);
+        assert((await zkSQL.tableCommitments("table1")).toBigInt() == newTableCommit, "Should update table commitment");
+        tableCommitments.set("table1", newTableCommit);
+        parserArgs.maxRows = 6;
+    });
+
+    it("UPDATE table1 SET f1=8, f3=8, f4=8, f5=8 WHERE f2 = 4", async () => {
+        const query = "UPDATE table1 SET f1=8, f3=8, f4=8, f5=8 WHERE f2 = 4";
+        const argsCommit = await commitToQuery(query, parserArgs);
+        await zkSQL.request("table1", argsCommit);
+
+        const INPUT = await execSqlQuery(db, query, parserArgs);
+        const { proof, newTableCommit } = await unpackProof(plonk.fullProve(
+            INPUT,
+            "circuits/build/update/update_js/update.wasm",
+            "circuits/build/update/circuit_final.zkey"
+        ));
+
+        await zkSQL.execRequest(1, argsCommit, newTableCommit, proof);
+        assert((await zkSQL.tableCommitments("table1")).toBigInt() == newTableCommit, "Should update table commitment");
+        tableCommitments.set("table1", newTableCommit);
+    });
+
+    it("DELETE FROM table1 WHERE f2 = 4", async () => {
+        const query = "DELETE FROM table1 WHERE f2 = 4";
+        const argsCommit = await commitToQuery(query, parserArgs);
+        await zkSQL.request("table1", argsCommit);
+
+        const INPUT = await execSqlQuery(db, query, parserArgs);
+        const { proof, newTableCommit } = await unpackProof(plonk.fullProve(
+            INPUT,
+            "circuits/build/delete/delete_js/delete.wasm",
+            "circuits/build/delete/circuit_final.zkey"
+        ));
+
+        await zkSQL.execRequest(2, argsCommit, newTableCommit, proof);
+        assert((await zkSQL.tableCommitments("table1")).toBigInt() == newTableCommit, "Should update table commitment");
+        tableCommitments.set("table1", newTableCommit);
     });
 });
+
+async function unpackProof(raw: Promise<any>): Promise<{proof: Uint8Array, newTableCommit: bigint}> {
+    let { proof, publicSignals } = await raw;
+
+    const editedPublicSignals = unstringifyBigInts(publicSignals);
+    const editedProof = unstringifyBigInts(proof);
+    const calldata = await plonk.exportSolidityCallData(editedProof, editedPublicSignals);
+    const argv = calldata.replace(/["[\]\s]/g, "").split(',').map((x: string) => BigInt(x));
+
+    proof = ethers.utils.arrayify(ethers.utils.hexlify(argv[0]));
+    let newTableCommit: bigint = argv[1];
+
+    return {proof, newTableCommit}
+}
 
 function unstringifyBigInts(o: any): any {
     if ((typeof(o) == "string") && (/^[0-9]+$/.test(o) ))  {

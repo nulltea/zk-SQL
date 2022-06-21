@@ -12,13 +12,34 @@ template UPDATE(nColumns,nRows,nAND,nOR) {
 
     signal input setExpressions[nColumns][2];
     signal input whereConditions[nOR][nAND][2];
+    signal input argsCommit;
 
     signal output newTableCommit;
-    signal output out[nRows][nColumns];
+    signal modified[nRows][nColumns];
 
     var i;
     var j;
     var k;
+
+
+    // Hash arguments
+    component preImage = CalculateTotal(nColumns * 2 + nOR*nAND*2);
+    component argsHasher = Poseidon(1);
+
+    for (i=0;i<nColumns;i++) {
+        preImage.nums[i*2] <== setExpressions[i][0];
+        preImage.nums[i*2+1] <== setExpressions[i][1];
+    }
+    for (i=0;i<nOR;i++) {
+        for (j=0;j<nAND;j++) {
+            var idx = nColumns*2+i*nAND*2+j*2;
+            preImage.nums[idx] <== whereConditions[i][j][0];
+            preImage.nums[idx+1] <== whereConditions[i][j][1];
+        }
+    }
+    
+    argsHasher.inputs[0] <== preImage.sum;
+    argsHasher.out === argsCommit;
 
     // Hash table along with header
     component hasher = HashTable(nColumns,nRows);
@@ -88,7 +109,7 @@ template UPDATE(nColumns,nRows,nAND,nOR) {
             newCellValues[i][j].nums[0] <== table[i][j] * cellNotToUpdate[i][j].out;
             newCellValues[i][j].nums[1] <== setExpressions[j][1] * cellToUpdate[i][j];
 
-            out[i][j] <== newCellValues[i][j].sum;
+            modified[i][j] <== newCellValues[i][j].sum;
         }
     }
 
@@ -101,11 +122,12 @@ template UPDATE(nColumns,nRows,nAND,nOR) {
 
     for (i=0;i<nRows;i++) {
         for (j=0;j<nColumns;j++) {
-            newHasher.table[i][j] <== out[i][j];
+            newHasher.table[i][j] <== modified[i][j];
         }
     }
 
     newTableCommit <== newHasher.out;
 }
 
-component main {public [tableCommit, whereConditions, setExpressions]} = UPDATE(5, 5, 5, 2);
+
+component main {public [tableCommit, argsCommit]} = UPDATE(5, 6, 5, 2);
