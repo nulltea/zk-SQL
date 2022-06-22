@@ -6,10 +6,11 @@ interface IVerifier {
 }
 
 
-
-
 contract ZkSQL {
     enum SqlOperation{ INSERT, UPDATE, DELETE }
+    event RequestPosted(address issuer, uint256 commitment);
+    event TableUpdated(string table, uint256 commitment);
+
     address public immutable insertVerifier;
     address public immutable updateVerifier;
     address public immutable deleteVerifier;
@@ -27,6 +28,7 @@ contract ZkSQL {
         public
     {
         requestsCommitments[argsCommitment] = table;
+        emit RequestPosted(msg.sender, argsCommitment);
     }
 
     function execRequest(SqlOperation opcode, uint256 argsCommitment, uint256 newCommitment, bytes memory proof)
@@ -44,6 +46,7 @@ contract ZkSQL {
         require(IVerifier(verifier).verifyProof(proof, publicInputs), "SNARK verification failed");
 
         tableCommitments[table] = newCommitment;
+        emit TableUpdated(table, newCommitment);
 
         return true;
     }

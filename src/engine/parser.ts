@@ -70,18 +70,17 @@ class WhereCondition {
             whereEncoded.push(inner);
         }
 
-        for (let i = 0; i < nOR - whereEncoded.length; i++) {
+        const emptyOrs = nOR - whereEncoded.length;
+        for (let i = 0; i < emptyOrs; i++) {
             whereEncoded.push([...Array(nAND)].map(_ => [0, 0]));
         }
+
 
         return whereEncoded;
     }
 }
 
-export function parseSelect(sql: string, args: ParserArgs): SelectQuery {
-    const parser = new Parser();
-    let {ast} = parser.parse(sql);
-
+export function parseSelect(ast: AST, args: ParserArgs): SelectQuery {
     let fields: number[] = [];
 
     if ("columns" in ast) {
@@ -114,11 +113,7 @@ export function parseSelect(sql: string, args: ParserArgs): SelectQuery {
     }
 }
 
-export function parseInsert(sql: string, args: ParserArgs): InsertQuery {
-    const parser = new Parser();
-    let {ast} = parser.parse(sql);
-
-
+export function parseInsert(ast: AST, args: ParserArgs): InsertQuery {
     if ("values" in ast && ast.values !== null && Array.isArray(ast.values)) {
         return {
             insertValues: ast.values[0].value.map((e) => "value" in e && typeof e.value === "number" ? e.value: 0)
@@ -128,10 +123,7 @@ export function parseInsert(sql: string, args: ParserArgs): InsertQuery {
     throw Error("unsupported values expression");
 }
 
-export function parseUpdate(sql: string, args: ParserArgs): UpdateQuery {
-    const parser = new Parser();
-    let {ast} = parser.parse(sql);
-
+export function parseUpdate(ast: AST, args: ParserArgs): UpdateQuery {
     let where = new WhereCondition();
     if ("where" in ast && ast.where !== null) {
         where = parseWhere(ast.where, args);
@@ -159,10 +151,7 @@ export function parseUpdate(sql: string, args: ParserArgs): UpdateQuery {
     }
 }
 
-export function parseDelete(sql: string, args: ParserArgs): DeleteQuery {
-    const parser = new Parser();
-    let {ast} = parser.parse(sql);
-
+export function parseDelete(ast: AST, args: ParserArgs): DeleteQuery {
     let where = new WhereCondition();
     if ("where" in ast && ast.where !== null) {
         where = parseWhere(ast.where, args);
