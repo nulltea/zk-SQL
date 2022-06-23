@@ -9,28 +9,29 @@ export type ParserArgs = {
 }
 
 type SelectQuery = {
-    fields: number[],
-    whereConditions: number[][][]
+    columns: string[],
+    fields: bigint[],
+    whereConditions: bigint[][][]
 }
 
 type InsertQuery = {
-    insertValues: number[]
+    insertValues: bigint[]
 }
 
 type UpdateQuery = {
-    setExpressions: number[][],
-    whereConditions: number[][][]
+    setExpressions: bigint[][],
+    whereConditions: bigint[][][]
 }
 
 type DeleteQuery = {
-    whereConditions: number[][][]
+    whereConditions: bigint[][][]
 }
 
 class Condition {
-    left: number;
-    right: number;
+    left: bigint;
+    right: bigint;
 
-    public constructor(left: number, right: number) {
+    public constructor(left: bigint, right: bigint) {
         this.left = left;
         this.right = right;
     }
@@ -55,16 +56,16 @@ class WhereCondition {
         }
     }
 
-    public serialize(nAND: number, nOR: number): number[][][] {
+    public serialize(nAND: number, nOR: number): bigint[][][] {
         let whereEncoded = [];
         for (const andCond of this.conditions) {
             let inner = [];
             for (let i = 0; i < nAND; i++) {
-                let cond = andCond.conditions.find((c) => c.left == i + 1);
+                let cond = andCond.conditions.find((c) => c.left == BigInt(i + 1));
                 if (cond !== undefined) {
                     inner.push([cond.left, cond.right]);
                 } else {
-                    inner.push([0,0])
+                    inner.push([0n,0n])
                 }
             }
             whereEncoded.push(inner);
@@ -72,7 +73,7 @@ class WhereCondition {
 
         const emptyOrs = nOR - whereEncoded.length;
         for (let i = 0; i < emptyOrs; i++) {
-            whereEncoded.push([...Array(nAND)].map(_ => [0, 0]));
+            whereEncoded.push([...Array(nAND)].map(_ => [0n, 0n]));
         }
 
 
@@ -81,13 +82,15 @@ class WhereCondition {
 }
 
 export function parseSelect(ast: AST, args: ParserArgs): SelectQuery {
-    let fields: number[] = [];
+    let fields: bigint[] = [];
+    let columns: string[] = [];
 
     if ("columns" in ast) {
         if (ast.columns === '*') {
-            fields = [...Array(args.headerMap.size)].map(_ => 1);
+            fields = [...Array(args.headerMap.size)].map(_ => 1n);
+            columns = Array.from(args.headerMap.keys());
         } else {
-            fields = [...Array(args.headerMap.size)].map(_ => 0)
+            fields = [...Array(args.headerMap.size)].map(_ => 0n)
 
             ast.columns!.forEach((cRef) => {
                 let columnIdx = args.headerMap.get(cRef.expr.column);
@@ -95,7 +98,8 @@ export function parseSelect(ast: AST, args: ParserArgs): SelectQuery {
                     throw Error("unknown column");
                 }
 
-                fields[columnIdx - 1] = 1;
+                fields[columnIdx - 1] = 1n;
+                columns.push(cRef.expr.column);
             });
         }
     } else {
@@ -108,7 +112,8 @@ export function parseSelect(ast: AST, args: ParserArgs): SelectQuery {
     }
 
     return {
-        fields: fields,
+        columns,
+        fields,
         whereConditions: where.serialize(args.maxAND, args.maxOR)
     }
 }
@@ -135,12 +140,12 @@ export function parseUpdate(ast: AST, args: ParserArgs): UpdateQuery {
             let cond = ast.set.find((c) => args.headerMap.get(c.column) == i + 1);
             if (cond !== undefined) {
                 if ("value" in cond) {
-                    setExpressions.push([i + 1, cond.value.value]);
+                    setExpressions.push([BigInt(i + 1), BigInt(cond.value.value)]);
                 } else {
                     throw Error("unsupported set value");
                 }
             } else {
-                setExpressions.push([0,0])
+                setExpressions.push([0n,0n])
             }
         }
     }
@@ -226,7 +231,7 @@ function parseCondition(ast: {operator: string, left: any, right: any}, args: Pa
                 throw Error("unknown column");
             }
 
-            return new Condition(columnIdx, ast.right.value);
+            return new Condition(BigInt(columnIdx), BigInt(ast.right.value));
         }
     }
 

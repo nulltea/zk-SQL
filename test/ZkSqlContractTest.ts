@@ -64,7 +64,7 @@ describe("zk-SQL - Contracts", () => {
         const res = await execQuery(db, query, commit, parserArgs, true);
         const newTableCommit = res.publicInputs![0];
 
-        await zkSQL.execRequest(0, commit, newTableCommit, res.proof!);
+        await zkSQL.execRequest(0, commit, newTableCommit, res.solidityProof!);
         assert((await zkSQL.tableCommitments("table1")).toBigInt() == newTableCommit, "Should update table commitment");
         tableCommitments.set("table1", newTableCommit);
         parserArgs.maxRows = 6;
@@ -78,7 +78,7 @@ describe("zk-SQL - Contracts", () => {
         const res = await execQuery(db, query, commit, parserArgs, true);
         const newTableCommit = res.publicInputs![0];
 
-        await zkSQL.execRequest(1, commit, newTableCommit, res.proof!);
+        await zkSQL.execRequest(1, commit, newTableCommit, res.solidityProof!);
         assert((await zkSQL.tableCommitments("table1")).toBigInt() == newTableCommit, "Should update table commitment");
         tableCommitments.set("table1", newTableCommit);
     });
@@ -91,7 +91,7 @@ describe("zk-SQL - Contracts", () => {
         const res = await execQuery(db, query, commit, parserArgs, true);
         const newTableCommit = res.publicInputs![0];
 
-        await zkSQL.execRequest(2, commit, newTableCommit, res.proof!);
+        await zkSQL.execRequest(2, commit, newTableCommit, res.solidityProof!);
         assert((await zkSQL.tableCommitments("table1")).toBigInt() == newTableCommit, "Should update table commitment");
         tableCommitments.set("table1", newTableCommit);
     });

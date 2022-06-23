@@ -1,11 +1,10 @@
 import {Controller} from "@tsed/di";
 import {Post} from "@tsed/schema";
 import {BodyParams} from "@tsed/platform-params";
-import {SqlValue} from "sql.js";
-import {genArgsCommitment, execQuery, SqlRow} from "../../engine/engine";
+import {execQuery, SqlRow, typeOfQuery} from "../../engine/engine";
 import {db} from "../../engine/database";
 import {ParserArgs} from "../../engine/parser";
-import {pendingRequests} from "../../engine/chainListener";
+import {getSqlOpcode, pendingRequests, provider, zkSqlContract} from "../../engine/chainListener";
 
 type SqlRequest = {
   sql: string
@@ -13,9 +12,8 @@ type SqlRequest = {
 }
 
 export type SqlResponse = {
-  data?: SqlRow[]
-  proof?: Uint8Array,
-  publicInputs?: bigint[],
+  data: SqlRow[] | string
+  proof: any,
 }
 
 const parserArgs: ParserArgs = {
@@ -29,18 +27,24 @@ const parserArgs: ParserArgs = {
 export class QueryController {
   @Post()
   async updatePayload(@BodyParams() payload: SqlRequest): Promise<SqlResponse> {
+    const type = typeOfQuery(payload.sql);
     const argsCommit = BigInt(payload.commit);
-    console.log(argsCommit);
-    if (!pendingRequests.has(argsCommit)) {
-      throw Error("unknown request, commit to on-chain");
+
+    if (type != "select") {
+      if (!pendingRequests.has(argsCommit)) {
+        throw Error("unknown request, commit to on-chain");
+      }
     }
 
     let res = await execQuery(db, payload.sql, argsCommit, parserArgs, true);
 
+    if (type != "select") {
+      await zkSqlContract.execRequest(getSqlOpcode(type), argsCommit, res.publicInputs![0], res.solidityProof!);
+    }
+
     return {
-      data: res.data,
-      proof: res.proof,
-      publicInputs: res.publicInputs
+      data: res.data ?? res.publicInputs![0].toString(),
+      proof: res.proof!,
     }
   }
 }

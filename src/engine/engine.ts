@@ -7,35 +7,35 @@ const buildPoseidon = require("circomlibjs").buildPoseidon;
 
 type SelectCircuitInputs = {
     header: number[],
-    table: number[][],
+    table: bigint[][],
     tableCommit: bigint,
-    fields: number[],
-    whereConditions: number[][][],
-    results: number[][],
+    fields: bigint[],
+    whereConditions: bigint[][][],
+    results: bigint[][],
 }
 
 type InsertCircuitInputs = {
     header: number[],
-    table: number[][],
+    table: bigint[][],
     tableCommit: bigint,
-    insertValues: number[],
+    insertValues: bigint[],
     argsCommit: bigint,
 }
 
 type UpdateCircuitInputs = {
     header: number[],
-    table: number[][],
+    table: bigint[][],
     tableCommit: bigint,
-    whereConditions: number[][][],
-    setExpressions: number[][],
+    whereConditions: bigint[][][],
+    setExpressions: bigint[][],
     argsCommit: bigint,
 }
 
 type DeleteCircuitInputs = {
     header: number[],
-    table: number[][],
+    table: bigint[][],
     tableCommit: bigint,
-    whereConditions: number[][][],
+    whereConditions: bigint[][][],
     argsCommit: bigint,
 }
 
@@ -49,7 +49,8 @@ export type SqlRow = {
 
 type ExecResult = {
     data?: SqlRow[]
-    proof?: Uint8Array,
+    proof?: any,
+    solidityProof?: Uint8Array,
     publicInputs?: bigint[],
     inputs: SelectCircuitInputs | InsertCircuitInputs | UpdateCircuitInputs | DeleteCircuitInputs
 }
@@ -71,6 +72,7 @@ export async function execQuery(db: Database, query: string, argsCommit: bigint,
     const tableState = db.exec(`SELECT * FROM ${tableName}`)[0];
     tableState.columns.shift();
     const tableHeader = tableState.columns.map((c) => args.headerMap.get(c)!);
+    const formattedTable = formatForCircuit(tableState.columns, formatSqlValues(tableState.values), args);
 
     switch (ast.type) {
         case "select": {
@@ -80,28 +82,30 @@ export async function execQuery(db: Database, query: string, argsCommit: bigint,
             }
             const selected = db.exec(parser.sqlify(ast))[0];
             selected.columns.shift();
-            const formattedView = formatForCircuit(selected.columns, selected.values, args);
+            let formattedView = formatSqlValues(selected.values);
+            const results = formatForCircuit(selected.columns, formattedView, args);
 
             const result: ExecResult = {
-                data: formatForResponse(selected.columns, selected.values, args),
+                data: formattedView,
                 inputs: {
                     header: tableHeader,
-                    table: formatForCircuit(tableState.columns, tableState.values, args),
+                    table: formattedTable,
                     tableCommit: tableCommitments.get(tableName)!,
                     fields: parsed.fields,
                     whereConditions: parsed.whereConditions,
-                    results: formattedView
+                    results
                 }
             };
 
             if (prove) {
-                const {proof, newTableCommit} = await unpackProof(plonk.fullProve(
+                const {proof, solidityProof, newTableCommit} = await unpackProof(plonk.fullProve(
                     result.inputs,
                     "circuits/build/select/select_js/select.wasm",
                     "circuits/build/select/circuit_final.zkey"
                 ));
 
                 result.proof = proof;
+                result.solidityProof = solidityProof;
                 result.publicInputs = [newTableCommit];
             }
 
@@ -114,7 +118,7 @@ export async function execQuery(db: Database, query: string, argsCommit: bigint,
             const result: ExecResult = {
                 inputs: {
                     header: tableHeader,
-                    table: formatForCircuit(tableState.columns, tableState.values, args),
+                    table: formattedTable,
                     tableCommit: tableCommitments.get(tableName)!,
                     insertValues: parsed.insertValues,
                     argsCommit: argsCommit,
@@ -122,13 +126,14 @@ export async function execQuery(db: Database, query: string, argsCommit: bigint,
             };
 
             if (prove) {
-                const {proof, newTableCommit} = await unpackProof(plonk.fullProve(
+                const {proof, solidityProof, newTableCommit} = await unpackProof(plonk.fullProve(
                     result.inputs,
                     "circuits/build/insert/insert_js/insert.wasm",
                     "circuits/build/insert/circuit_final.zkey"
                 ));
 
                 result.proof = proof;
+                result.solidityProof = solidityProof;
                 result.publicInputs = [newTableCommit, tableCommitments.get(tableName)!, argsCommit];
             }
 
@@ -145,7 +150,7 @@ export async function execQuery(db: Database, query: string, argsCommit: bigint,
             const result: ExecResult = {
                 inputs: {
                     header: tableHeader,
-                    table: formatForCircuit(tableState.columns, tableState.values, args),
+                    table: formattedTable,
                     tableCommit: tableCommitments.get(tableName)!,
                     whereConditions: parsed.whereConditions,
                     setExpressions: parsed.setExpressions,
@@ -154,13 +159,14 @@ export async function execQuery(db: Database, query: string, argsCommit: bigint,
             };
 
             if (prove) {
-                const {proof, newTableCommit} = await unpackProof(plonk.fullProve(
+                const {proof, solidityProof, newTableCommit} = await unpackProof(plonk.fullProve(
                     result.inputs,
                     "circuits/build/update/update_js/update.wasm",
                     "circuits/build/update/circuit_final.zkey"
                 ));
 
                 result.proof = proof;
+                result.solidityProof = solidityProof;
                 result.publicInputs = [newTableCommit, tableCommitments.get(tableName)!, argsCommit];
             }
 
@@ -174,7 +180,7 @@ export async function execQuery(db: Database, query: string, argsCommit: bigint,
             const result: ExecResult = {
                 inputs: {
                     header: tableHeader,
-                    table: formatForCircuit(tableState.columns, tableState.values, args),
+                    table: formattedTable,
                     tableCommit: tableCommitments.get(tableName)!,
                     whereConditions: parsed.whereConditions,
                     argsCommit: argsCommit,
@@ -182,13 +188,14 @@ export async function execQuery(db: Database, query: string, argsCommit: bigint,
             };
 
             if (prove) {
-                const {proof, newTableCommit} = await unpackProof(plonk.fullProve(
+                const {proof, solidityProof, newTableCommit} = await unpackProof(plonk.fullProve(
                     result.inputs,
                     "circuits/build/delete/delete_js/delete.wasm",
                     "circuits/build/delete/circuit_final.zkey"
                 ));
 
                 result.proof = proof;
+                result.solidityProof = solidityProof;
                 result.publicInputs = [newTableCommit, tableCommitments.get(tableName)!, argsCommit];
             }
 
@@ -228,7 +235,6 @@ export async function genArgsCommitment(ast: AST, args: ParserArgs): Promise<big
         throw Error("bad query");
     }
 
-
     const poseidon = await buildPoseidon();
 
     switch (ast.type) {
@@ -241,16 +247,27 @@ export async function genArgsCommitment(ast: AST, args: ParserArgs): Promise<big
             const updParsed = parseUpdate(ast, args);
             let flatExpressions = updParsed.setExpressions.flat();
             flatExpressions = flatExpressions.concat(...updParsed.whereConditions.flat());
-            let updPreImage = flatExpressions.reduce((sum, x) => sum + x, 0);
+            let updPreImage = flatExpressions.reduce((sum, x) => sum + x, 0n);
             return poseidon.F.toObject(poseidon([updPreImage]));
         case "delete":
             const delParsed = parseDelete(ast, args);
-            let delPreImage = delParsed.whereConditions.flat(2).reduce((sum, x) => sum + x, 0);
+            let delPreImage = delParsed.whereConditions.flat(2).reduce((sum, x) => sum + x, 0n);
 
             return poseidon.F.toObject(poseidon([delPreImage]));
     }
 
     throw Error("unsupported query");
+}
+
+export function typeOfQuery(query: string): string {
+    const parser = new Parser();
+    let {ast} = parser.parse(query)
+
+    if (!("type" in ast)) {
+        throw Error("bad query");
+    }
+
+   return ast.type;
 }
 
 export function parseTableName(ast: AST): string {
@@ -265,18 +282,18 @@ export function parseTableName(ast: AST): string {
     throw Error("unsupported query");
 }
 
-function formatForCircuit(columns: string[], values: SqlValue[][], args: ParserArgs): number[][] {
+export function formatForCircuit(columns: string[], values: SqlRow[], args: ParserArgs): bigint[][] {
     let formatted = [];
-    const emptyRow = [...Array(args.headerMap.size)].map(_ => 0);
+    const emptyRow = [...Array(args.headerMap.size)].map(_ => 0n);
     const columnMap = Array.from(args.headerMap.keys())
-        .map((column) => columns.indexOf(column) + 1);
+        .map((column) => columns.indexOf(column));
 
     for (let i = 0; i < args.maxRows; i++) {
-        let row = values.find((row) => row[0] == i + 1);
+        let row = values.find((row) => row.idx == i + 1);
         if (row !== undefined) {
             let fRow = [];
             for (let j = 0; j < args.headerMap.size; j++) {
-                fRow.push(columnMap[j] > 0 ? row[columnMap[j]] as number : 0);
+                fRow.push(columnMap[j] > -1 ? encodeSqlValue(row.values[columnMap[j]]) : 0n);
             }
             formatted.push(fRow);
         } else {
@@ -287,18 +304,22 @@ function formatForCircuit(columns: string[], values: SqlValue[][], args: ParserA
     return formatted;
 }
 
-function formatForResponse(columns: string[], values: SqlValue[][], args: ParserArgs): SqlRow[] {
+function formatSqlValues(values: SqlValue[][]): SqlRow[] {
     let formatted = [];
 
     for (let row of values) {
-        const idx = row.shift() as number;
-        formatted.push({idx, values: row});
+        const idx = row[0] as number;
+        formatted.push({idx, values: row.slice(1)});
     }
 
     return formatted;
 }
 
-async function unpackProof(raw: Promise<any>): Promise<{proof: Uint8Array, newTableCommit: bigint}> {
+function encodeSqlValue(v: SqlValue): bigint {
+    return BigInt(v as number);
+}
+
+async function unpackProof(raw: Promise<any>): Promise<{proof: any, solidityProof: Uint8Array, newTableCommit: bigint}> {
     let { proof, publicSignals } = await raw;
 
     const editedPublicSignals = unstringifyBigInts(publicSignals);
@@ -306,10 +327,10 @@ async function unpackProof(raw: Promise<any>): Promise<{proof: Uint8Array, newTa
     const calldata = await plonk.exportSolidityCallData(editedProof, editedPublicSignals);
     const argv = calldata.replace(/["[\]\s]/g, "").split(',').map((x: string) => BigInt(x));
 
-    proof = ethers.utils.arrayify(ethers.utils.hexlify(argv[0]));
+    const solidityProof = ethers.utils.arrayify(ethers.utils.hexlify(argv[0]));
     let newTableCommit: bigint = argv[1];
 
-    return {proof, newTableCommit}
+    return {proof, solidityProof, newTableCommit}
 }
 
 function unstringifyBigInts(o: any): any {

@@ -1,10 +1,10 @@
 import ZkSQL from "../../artifacts/contracts/zkSQL.sol/ZkSQL.json";
 import {Contract, providers, Signer} from "ethers";
 import {ZkSQL as IZkSQL} from "../../typechain-types";
-import {ParserArgs} from "../engine/parser";
+import {ParserArgs, parseSelect} from "../engine/parser";
 import {commitToQuery} from "../engine/engine";
 import {SqlResponse} from "../controllers/rest";
-const {plonk} = require("snarkjs");
+import {genPublicSignals, verifyProof} from "../engine/verify";
 
 
 // todo: remove
@@ -24,14 +24,10 @@ export async function makeSqlRequest(sql: string, cfg: ClientConfig) {
     const contract = new Contract("0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9", ZkSQL.abi)
     const contractOwner = contract.connect(provider.getSigner()) as IZkSQL;
     const {commit, table, type} = await commitToQuery(sql, parserArgs);
+    const tableCommit = (await contractOwner.tableCommitments(table)).toBigInt();
     if (type != "select") {
         await contractOwner.request(table, commit);
     }
-
-    console.log(commit, JSON.stringify({
-        sql: sql,
-        commit: commit.toString(),
-    }));
 
     const res = await fetch(`${cfg.serverAddress}/api/query`, {
         method: "POST",
@@ -49,22 +45,11 @@ export async function makeSqlRequest(sql: string, cfg: ClientConfig) {
     }
 
     let respBody: SqlResponse = await res.json();
+    let publicSignals = genPublicSignals(sql, commit, parserArgs, tableCommit, respBody.data);
 
-    switch (type) {
-        case "select":
-            plonk.verify("circuits/build/select/verification_key.json", respBody.publicInputs, respBody.proof);
-            break;
-        case "insert":
-            plonk.verify("circuits/build/insert/verification_key.json", respBody.publicInputs, respBody.proof);
-            break;
-        case "update":
-            plonk.verify("circuits/build/update/verification_key.json", respBody.publicInputs, respBody.proof);
-            break;
-        case "delete":
-            plonk.verify("circuits/build/delete/verification_key.json", respBody.publicInputs, respBody.proof);
-            break;
+    if (!await verifyProof(type, publicSignals, respBody.proof)) {
+        throw Error("invalid proof");
     }
 
-    console.log("proof is valid!");
-    console.log(respBody);
+    console.log("proof is valid! data:", respBody.data);
 }

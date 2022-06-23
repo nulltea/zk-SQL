@@ -32,10 +32,10 @@ describe("zk-SQL - API", () => {
         tableCommitments.set("table1", 6192063684007625405622444875231245009508356906093894343979231563958794510376n);
     });
 
-    // it("SELECT * FROM table1 WHERE f2 = 4", async () => {
-    //     const query = "SELECT * FROM table1 WHERE f2 = 4";
-    //     await makeSqlRequest(query, clientConfig);
-    // });
+    it("SELECT * FROM table1 WHERE f2 = 4", async () => {
+        const query = "SELECT * FROM table1 WHERE f2 = 4";
+        await makeSqlRequest(query, clientConfig);
+    });
 
     it("INSERT INTO table1 VALUES (1, 2, 3, 4, 5)", async () => {
         const query = "INSERT INTO table1 VALUES (1, 2, 3, 4, 5)";
