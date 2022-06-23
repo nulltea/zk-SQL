@@ -11,12 +11,23 @@ template INSERT(c,r) {
     signal input tableCommit;
 
     signal input insertValues[c];
+    signal input argsCommit;
     
     signal output newTableCommit;
-    signal output out[r+1][c];
+    signal modified[r+1][c];
 
     var i;
     var j;
+
+    // Hash arguments
+    component argsHasher = Poseidon(c);
+
+    for (i=0;i<c;i++) {
+        argsHasher.inputs[i] <== insertValues[i];
+    }
+
+    argsHasher.out === argsCommit;
+
 
     // Hash table along with header
     component hasher = HashTable(c,r);
@@ -39,12 +50,12 @@ template INSERT(c,r) {
 
     for (i=0; i<r; i++) {
         for (j=0; j<c; j++) {
-            out[i][j] <== table[i][j];
+            modified[i][j] <== table[i][j];
         }
     }
 
     for (j=0; j<c; j++) {
-        out[r][j] <== insertValues[j];
+        modified[r][j] <== insertValues[j];
     }
 
     // Hash table and header again to produce new commitment.
@@ -56,11 +67,11 @@ template INSERT(c,r) {
 
     for (i=0;i<r+1;i++) {
         for (j=0;j<c;j++) {
-            newHasher.table[i][j] <== out[i][j];
+            newHasher.table[i][j] <== modified[i][j];
         }
     }
 
     newTableCommit <== newHasher.out;
 }
 
-component main {public [tableCommit, insertValues]} = INSERT(5, 5);
+component main {public [tableCommit, argsCommit]} = INSERT(5, 5);

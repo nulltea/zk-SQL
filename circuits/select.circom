@@ -15,8 +15,6 @@ template SELECT(nColumns, nRows, nAND, nOR) {
 
     signal input results[nRows][nColumns];
 
-    signal output out[nRows][nColumns];
-
     var i;
     var j;
     var k;
@@ -69,7 +67,7 @@ template SELECT(nColumns, nRows, nAND, nOR) {
                 equalCell[i][k][j] = IsEqual();
                 equalCell[i][k][j].in[0] <== whereConditions[k][j][1] * isFilterColumn[i][k][j].out;
                 equalCell[i][k][j].in[1] <== table[i][j] * isFilterColumn[i][k][j].out;
-                
+
                 filterRowAND[i][k].in[j] <== equalCell[i][k][j].out;
             }
 
@@ -79,8 +77,7 @@ template SELECT(nColumns, nRows, nAND, nOR) {
         for (j=0; j<nColumns; j++) {
             assert(fields[j] >= 0 && fields[j] <= 1);
             isCell[i][j] <== filterRow[i].out * fields[j];
-            out[i][j] <== table[i][j] * isCell[i][j];
-            results[i][j] === out[i][j];
+            results[i][j] === table[i][j] * isCell[i][j];
         }
     }
 }

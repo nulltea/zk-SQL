@@ -23,11 +23,11 @@ snarkjs r1cs info build/$CIRCUIT_NAME/$CIRCUIT_NAME.r1cs
 
 # Start a new zkey and make a contribution
 
-snarkjs groth16 setup build/$CIRCUIT_NAME/$CIRCUIT_NAME.r1cs powersOfTau28_hez_final_16.ptau build/$CIRCUIT_NAME/circuit_0000.zkey
-snarkjs zkey contribute build/$CIRCUIT_NAME/circuit_0000.zkey build/$CIRCUIT_NAME/circuit_final.zkey --name="1st Contributor Name" -v -e="random text"
+snarkjs plonk setup build/$CIRCUIT_NAME/$CIRCUIT_NAME.r1cs powersOfTau28_hez_final_16.ptau build/$CIRCUIT_NAME/circuit_final.zkey
+## snarkjs zkey contribute build/$CIRCUIT_NAME/circuit_0000.zkey build/$CIRCUIT_NAME/circuit_final.zkey --name="1st Contributor Name" -v -e="random text"
 snarkjs zkey export verificationkey build/$CIRCUIT_NAME/circuit_final.zkey build/$CIRCUIT_NAME/verification_key.json
 
 # generate solidity contract
-# snarkjs zkey export solidityverifier $CIRCUIT_NAME/circuit_final.zkey ../${CIRCUIT_NAME}Verifier.sol
+snarkjs zkey export solidityverifier build/$CIRCUIT_NAME/circuit_final.zkey ../contracts/${CIRCUIT_NAME}Verifier.sol
 
 cd ..

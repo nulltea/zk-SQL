@@ -9,28 +9,29 @@ export type ParserArgs = {
 }
 
 type SelectQuery = {
-    fields: number[],
-    whereConditions: number[][][]
+    columns: string[],
+    fields: bigint[],
+    whereConditions: bigint[][][]
 }
 
 type InsertQuery = {
-    insertValues: number[]
+    insertValues: bigint[]
 }
 
 type UpdateQuery = {
-    setExpressions: number[][],
-    whereConditions: number[][][]
+    setExpressions: bigint[][],
+    whereConditions: bigint[][][]
 }
 
 type DeleteQuery = {
-    whereConditions: number[][][]
+    whereConditions: bigint[][][]
 }
 
 class Condition {
-    left: number;
-    right: number;
+    left: bigint;
+    right: bigint;
 
-    public constructor(left: number, right: number) {
+    public constructor(left: bigint, right: bigint) {
         this.left = left;
         this.right = right;
     }
@@ -55,40 +56,41 @@ class WhereCondition {
         }
     }
 
-    public serialize(nAND: number, nOR: number): number[][][] {
+    public serialize(nAND: number, nOR: number): bigint[][][] {
         let whereEncoded = [];
         for (const andCond of this.conditions) {
             let inner = [];
             for (let i = 0; i < nAND; i++) {
-                let cond = andCond.conditions.find((c) => c.left == i + 1);
+                let cond = andCond.conditions.find((c) => c.left == BigInt(i + 1));
                 if (cond !== undefined) {
                     inner.push([cond.left, cond.right]);
                 } else {
-                    inner.push([0,0])
+                    inner.push([0n,0n])
                 }
             }
             whereEncoded.push(inner);
         }
 
-        for (let i = 0; i < nOR - whereEncoded.length; i++) {
-            whereEncoded.push([...Array(nAND)].map(_ => [0, 0]));
+        const emptyOrs = nOR - whereEncoded.length;
+        for (let i = 0; i < emptyOrs; i++) {
+            whereEncoded.push([...Array(nAND)].map(_ => [0n, 0n]));
         }
+
 
         return whereEncoded;
     }
 }
 
-export function parseSelect(sql: string, args: ParserArgs): SelectQuery {
-    const parser = new Parser();
-    let {ast} = parser.parse(sql);
-
-    let fields: number[] = [];
+export function parseSelect(ast: AST, args: ParserArgs): SelectQuery {
+    let fields: bigint[] = [];
+    let columns: string[] = [];
 
     if ("columns" in ast) {
         if (ast.columns === '*') {
-            fields = [...Array(args.headerMap.size)].map(_ => 1);
+            fields = [...Array(args.headerMap.size)].map(_ => 1n);
+            columns = Array.from(args.headerMap.keys());
         } else {
-            fields = [...Array(args.headerMap.size)].map(_ => 0)
+            fields = [...Array(args.headerMap.size)].map(_ => 0n)
 
             ast.columns!.forEach((cRef) => {
                 let columnIdx = args.headerMap.get(cRef.expr.column);
@@ -96,7 +98,8 @@ export function parseSelect(sql: string, args: ParserArgs): SelectQuery {
                     throw Error("unknown column");
                 }
 
-                fields[columnIdx - 1] = 1;
+                fields[columnIdx - 1] = 1n;
+                columns.push(cRef.expr.column);
             });
         }
     } else {
@@ -109,16 +112,13 @@ export function parseSelect(sql: string, args: ParserArgs): SelectQuery {
     }
 
     return {
-        fields: fields,
+        columns,
+        fields,
         whereConditions: where.serialize(args.maxAND, args.maxOR)
     }
 }
 
-export function parseInsert(sql: string, args: ParserArgs): InsertQuery {
-    const parser = new Parser();
-    let {ast} = parser.parse(sql);
-
-
+export function parseInsert(ast: AST, args: ParserArgs): InsertQuery {
     if ("values" in ast && ast.values !== null && Array.isArray(ast.values)) {
         return {
             insertValues: ast.values[0].value.map((e) => "value" in e && typeof e.value === "number" ? e.value: 0)
@@ -128,10 +128,7 @@ export function parseInsert(sql: string, args: ParserArgs): InsertQuery {
     throw Error("unsupported values expression");
 }
 
-export function parseUpdate(sql: string, args: ParserArgs): UpdateQuery {
-    const parser = new Parser();
-    let {ast} = parser.parse(sql);
-
+export function parseUpdate(ast: AST, args: ParserArgs): UpdateQuery {
     let where = new WhereCondition();
     if ("where" in ast && ast.where !== null) {
         where = parseWhere(ast.where, args);
@@ -143,12 +140,12 @@ export function parseUpdate(sql: string, args: ParserArgs): UpdateQuery {
             let cond = ast.set.find((c) => args.headerMap.get(c.column) == i + 1);
             if (cond !== undefined) {
                 if ("value" in cond) {
-                    setExpressions.push([i + 1, cond.value.value]);
+                    setExpressions.push([BigInt(i + 1), BigInt(cond.value.value)]);
                 } else {
                     throw Error("unsupported set value");
                 }
             } else {
-                setExpressions.push([0,0])
+                setExpressions.push([0n,0n])
             }
         }
     }
@@ -159,10 +156,7 @@ export function parseUpdate(sql: string, args: ParserArgs): UpdateQuery {
     }
 }
 
-export function parseDelete(sql: string, args: ParserArgs): DeleteQuery {
-    const parser = new Parser();
-    let {ast} = parser.parse(sql);
-
+export function parseDelete(ast: AST, args: ParserArgs): DeleteQuery {
     let where = new WhereCondition();
     if ("where" in ast && ast.where !== null) {
         where = parseWhere(ast.where, args);
@@ -237,7 +231,7 @@ function parseCondition(ast: {operator: string, left: any, right: any}, args: Pa
                 throw Error("unknown column");
             }
 
-            return new Condition(columnIdx, ast.right.value);
+            return new Condition(BigInt(columnIdx), BigInt(ast.right.value));
         }
     }
 
