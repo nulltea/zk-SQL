@@ -1,4 +1,4 @@
-import {ParserArgs, parseSelect} from "./parser";
+import {CircuitParams, parseSelect} from "./parser";
 import {Parser} from "node-sql-parser/build/mysql";
 import {formatForCircuit, parseTableName, tableCommitments} from "./engine";
 import * as fs from "fs";
@@ -10,7 +10,7 @@ export function verifyProof(type: string, publicInputs: bigint[], proof: Uint8Ar
     return plonk.verify(vKey, publicInputs, proof);
 }
 
-export function genPublicSignals(query: string, argsCommit: bigint, args: ParserArgs, tableCommit: bigint, ...inputs: any[]): bigint[]
+export function genPublicSignals(query: string, argsCommit: bigint, header: Map<string, number>, args: CircuitParams, tableCommit: bigint, ...inputs: any[]): bigint[]
 {
     const parser = new Parser();
     let {ast} = parser.parse(query)
@@ -26,8 +26,8 @@ export function genPublicSignals(query: string, argsCommit: bigint, args: Parser
 
     switch (ast.type) {
         case "select": {
-            const parsed = parseSelect(ast, args);
-            const data = formatForCircuit(parsed.columns, inputs[0], args);
+            const parsed = parseSelect(ast, header, args);
+            const data = formatForCircuit(parsed.columns, inputs[0], header, args);
             return [tableCommit].concat(parsed.fields).concat(parsed.whereConditions.flat(3)).concat(data.flat(2));
         }
         case "insert":

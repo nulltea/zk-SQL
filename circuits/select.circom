@@ -82,4 +82,4 @@ template SELECT(nColumns, nRows, nAND, nOR) {
     }
 }
 
-component main {public [tableCommit, whereConditions, fields, results]} = SELECT(5, 5, 5, 2);
+component main {public [tableCommit, whereConditions, fields, results]} = SELECT(5, 10, 5, 2);

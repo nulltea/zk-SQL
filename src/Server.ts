@@ -68,7 +68,7 @@ export class Server implements BeforeInit {
   protected settings: Configuration;
 
   async $beforeInit(): Promise<any> {
-    await initDB({
+    await initDB(true, {
       name: "table1",
       columns: ["f1", "f2", "f3", "f4", "f5"],
       values: [

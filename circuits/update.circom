@@ -130,4 +130,4 @@ template UPDATE(nColumns,nRows,nAND,nOR) {
 }
 
 
-component main {public [tableCommit, argsCommit]} = UPDATE(5, 6, 5, 2);
+component main {public [tableCommit, argsCommit]} = UPDATE(5, 10, 5, 2);

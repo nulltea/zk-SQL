@@ -116,4 +116,4 @@ template DELETE(nColumns,nRows,nAND,nOR) {
     newTableCommit <== newHasher.out;
 }
 
-component main {public [tableCommit, argsCommit]} = DELETE(5, 6, 5, 2);
+component main {public [tableCommit, argsCommit]} = DELETE(5, 10, 5, 2);

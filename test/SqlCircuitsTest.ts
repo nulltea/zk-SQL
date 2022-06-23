@@ -5,7 +5,7 @@ const ff = require("ffjavascript");
 const buildPoseidon = require("circomlibjs").buildPoseidon;
 exports.p = ff.Scalar.fromString("21888242871839275222246405745257275088548364400416034343698204186575808495617");
 const Fr = new ff.F1Field(exports.p);
-import {ParserArgs} from "../src/engine/parser"
+import {CircuitParams} from "../src/engine/parser"
 import {commitToQuery, execQuery, tableCommitments} from "../src/engine/engine";
 import {db, initDB} from "../src/engine/database";
 
@@ -23,12 +23,12 @@ describe("zk-SQL - Circuits", () => {
         [4, 5, 6, 7, 2],
         [5, 4, 7, 8, 9],
     ];
-    const parserArgs: ParserArgs = {
-        maxAND: 5, maxOR: 2, maxRows: 5,
-        headerMap: new Map<string, number>([
-            ["f1", 1], ["f2", 2], ["f3", 3], ["f4", 4], ["f5", 5],
-        ])
+    const circuitParams: CircuitParams = {
+        maxAND: 5, maxOR: 2, maxRows: 10,
     }
+    const knownTables = new Map<string, string[]>([
+        ["table1", ["f1", "f2", "f3", "f4", "f5"]],
+    ]);
 
     before(async () => {
         selectCircuit = await wasm_tester("circuits/select.circom");
@@ -43,7 +43,7 @@ describe("zk-SQL - Circuits", () => {
         deleteCircuit = await wasm_tester("circuits/delete.circom")
         await deleteCircuit.loadConstraints();
 
-        await initDB({
+        await initDB(false, {
             name: "table1",
             columns: ["f1", "f2", "f3", "f4", "f5"],
             values: [
@@ -59,28 +59,28 @@ describe("zk-SQL - Circuits", () => {
     });
 
     it("SELECT * FROM table1 WHERE f2 = 4", async () => {
-        const res = await execQuery(db, "SELECT * FROM table1 WHERE f2 = 4", 0n, parserArgs, false);
+        const res = await execQuery(db, "SELECT * FROM table1 WHERE f2 = 4", 0n, circuitParams, false);
         const witness = await selectCircuit.calculateWitness(res.inputs, true);
 
         assert(Fr.eq(Fr.e(witness[0]),Fr.e(1)));
     });
 
     it("SELECT f2, f3, f4 FROM table1 WHERE f2 = 4 AND f4 = 8", async () => {
-        const res = await execQuery(db, "SELECT f2, f3, f4 FROM table1 WHERE f2 = 4 AND f4 = 8", 0n, parserArgs, false);
+        const res = await execQuery(db, "SELECT f2, f3, f4 FROM table1 WHERE f2 = 4 AND f4 = 8", 0n, circuitParams, false);
         const witness = await selectCircuit.calculateWitness(res.inputs, true);
 
         assert(Fr.eq(Fr.e(witness[0]),Fr.e(1)));
     });
 
     it("SELECT * FROM table1 WHERE (f2 = 4 AND f4 = 8) OR (f4 = 4)", async () => {
-        const res = await execQuery(db, "SELECT * FROM table1 WHERE (f2 = 4 AND f4 = 8) OR (f4 = 4)", 0n, parserArgs, false);
+        const res = await execQuery(db, "SELECT * FROM table1 WHERE (f2 = 4 AND f4 = 8) OR (f4 = 4)", 0n, circuitParams, false);
         const witness = await selectCircuit.calculateWitness(res.inputs, true);
 
         assert(Fr.eq(Fr.e(witness[0]),Fr.e(1)));
     });
 
     it("SELECT * FROM table1", async () => {
-        const res = await execQuery(db, "SELECT * FROM table1", 0n, parserArgs, false);
+        const res = await execQuery(db, "SELECT * FROM table1", 0n, circuitParams, false);
         const witness = await selectCircuit.calculateWitness(res.inputs, true);
 
         assert(Fr.eq(Fr.e(witness[0]),Fr.e(1)));
@@ -88,14 +88,13 @@ describe("zk-SQL - Circuits", () => {
 
     it("INSERT INTO table1 VALUES (1, 2, 3, 4, 5)", async () => {
         const query = "INSERT INTO table1 VALUES (1, 2, 3, 4, 5)";
-        const {commit} = await commitToQuery(query, parserArgs);
-        const res = await execQuery(db, query, commit, parserArgs, false);
+        const {commit} = await commitToQuery(query, knownTables, circuitParams);
+        const res = await execQuery(db, query, commit, circuitParams, false);
         const witness = await insertCircuit.calculateWitness(res.inputs, true);
 
         const resultTable = table.concat([1, 2, 3, 4, 5]);
         const newTableHash = await hashTable(header, resultTable);
 
-        parserArgs.maxRows++;
         tableCommitments.set("table1", newTableHash);
 
         assert(Fr.eq(Fr.e(witness[0]),Fr.e(1)));
@@ -104,8 +103,8 @@ describe("zk-SQL - Circuits", () => {
 
     it("UPDATE table1 SET f1=8, f3=8, f4=8, f5=8 WHERE f2 = 4", async () => {
         const query = "UPDATE table1 SET f1=8, f3=8, f4=8, f5=8 WHERE f2 = 4";
-        const {commit} = await commitToQuery(query, parserArgs);
-        const res = await execQuery(db, query, commit, parserArgs, false);
+        const {commit} = await commitToQuery(query, knownTables, circuitParams);
+        const res = await execQuery(db, query, commit, circuitParams, false);
         const witness = await updateCircuit.calculateWitness(res.inputs, true);
 
         const results = [
@@ -125,8 +124,8 @@ describe("zk-SQL - Circuits", () => {
 
     it("DELETE FROM table1 WHERE f2 = 4", async () => {
         const query = "DELETE FROM table1 WHERE f2 = 4";
-        const {commit} = await commitToQuery(query, parserArgs);
-        const res = await execQuery(db, query, commit, parserArgs, false);
+        const {commit} = await commitToQuery(query, knownTables, circuitParams);
+        const res = await execQuery(db, query, commit, circuitParams, false);
         const witness = await deleteCircuit.calculateWitness(res.inputs, true);
 
         const results = [

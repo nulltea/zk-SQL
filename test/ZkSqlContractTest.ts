@@ -2,7 +2,7 @@ import {assert} from "chai";
 // @ts-ignore
 import { ethers } from "hardhat";
 const {plonk} = require("snarkjs");
-import {ParserArgs} from "../src/engine/parser"
+import {CircuitParams} from "../src/engine/parser"
 import initSqlJs, {Database} from "sql.js";
 import {genArgsCommitment, execQuery, tableCommitments, commitToQuery} from "../src/engine/engine";
 import {ZkSQL, } from "../typechain-types/zkSQL.sol";
@@ -17,12 +17,12 @@ describe("zk-SQL - Contracts", () => {
     let deleteVerifier: DeleteVerifier;
     let zkSQL: ZkSQL;
 
-    const parserArgs: ParserArgs = {
-        maxAND: 5, maxOR: 2, maxRows: 5,
-        headerMap: new Map<string, number>([
-            ["f1", 1], ["f2", 2], ["f3", 3], ["f4", 4], ["f5", 5],
-        ])
+    const circuitParams: CircuitParams = {
+        maxAND: 5, maxOR: 2, maxRows: 10,
     }
+    const knownTables = new Map<string, string[]>([
+        ["table1", ["f1", "f2", "f3", "f4", "f5"]],
+    ]);
 
     before(async () => {
         let insertFactory = await ethers.getContractFactory("contracts/insertVerifier.sol:PlonkVerifier");
@@ -41,7 +41,7 @@ describe("zk-SQL - Contracts", () => {
         zkSQL = await zkSqlFactory.deploy(insertVerifier.address, updateVerifier.address, deleteVerifier.address) as ZkSQL;
         await zkSQL.deployed();
 
-        await initDB({
+        await initDB(false, {
             name: "table1",
             columns: ["f1", "f2", "f3", "f4", "f5"],
             values: [
@@ -58,24 +58,23 @@ describe("zk-SQL - Contracts", () => {
 
     it("INSERT INTO table1 VALUES (1, 2, 3, 4, 5)", async () => {
         const query = "INSERT INTO table1 VALUES (1, 2, 3, 4, 5)";
-        const {commit} = await commitToQuery(query, parserArgs);
+        const {commit} = await commitToQuery(query, knownTables, circuitParams);
         await zkSQL.request("table1", commit);
 
-        const res = await execQuery(db, query, commit, parserArgs, true);
+        const res = await execQuery(db, query, commit, circuitParams, true);
         const newTableCommit = res.publicInputs![0];
 
         await zkSQL.execRequest(0, commit, newTableCommit, res.solidityProof!);
         assert((await zkSQL.tableCommitments("table1")).toBigInt() == newTableCommit, "Should update table commitment");
         tableCommitments.set("table1", newTableCommit);
-        parserArgs.maxRows = 6;
     });
 
     it("UPDATE table1 SET f1=8, f3=8, f4=8, f5=8 WHERE f2 = 4", async () => {
         const query = "UPDATE table1 SET f1=8, f3=8, f4=8, f5=8 WHERE f2 = 4";
-        const {commit} = await commitToQuery(query, parserArgs);
+        const {commit} = await commitToQuery(query, knownTables, circuitParams);
         await zkSQL.request("table1", commit);
 
-        const res = await execQuery(db, query, commit, parserArgs, true);
+        const res = await execQuery(db, query, commit, circuitParams, true);
         const newTableCommit = res.publicInputs![0];
 
         await zkSQL.execRequest(1, commit, newTableCommit, res.solidityProof!);
@@ -85,10 +84,10 @@ describe("zk-SQL - Contracts", () => {
 
     it("DELETE FROM table1 WHERE f2 = 4", async () => {
         const query = "DELETE FROM table1 WHERE f2 = 4";
-        const {commit} = await commitToQuery(query, parserArgs);
+        const {commit} = await commitToQuery(query, knownTables, circuitParams);
         await zkSQL.request("table1", commit);
 
-        const res = await execQuery(db, query, commit, parserArgs, true);
+        const res = await execQuery(db, query, commit, circuitParams, true);
         const newTableCommit = res.publicInputs![0];
 
         await zkSQL.execRequest(2, commit, newTableCommit, res.solidityProof!);

@@ -74,4 +74,4 @@ template INSERT(c,r) {
     newTableCommit <== newHasher.out;
 }
 
-component main {public [tableCommit, argsCommit]} = INSERT(5, 5);
+component main {public [tableCommit, argsCommit]} = INSERT(5, 10);

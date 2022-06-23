@@ -1,4 +1,4 @@
-import {parseDelete, parseInsert, ParserArgs, parseSelect, parseUpdate} from "./parser";
+import {parseDelete, parseInsert, CircuitParams, parseSelect, parseUpdate} from "./parser";
 import {AST, Parser} from "node-sql-parser/build/mysql";
 import {Database, SqlValue} from "sql.js";
 import {ethers} from "ethers";
@@ -48,6 +48,7 @@ export type SqlRow = {
 }
 
 type ExecResult = {
+    tableName: string,
     data?: SqlRow[]
     proof?: any,
     solidityProof?: Uint8Array,
@@ -55,7 +56,7 @@ type ExecResult = {
     inputs: SelectCircuitInputs | InsertCircuitInputs | UpdateCircuitInputs | DeleteCircuitInputs
 }
 
-export async function execQuery(db: Database, query: string, argsCommit: bigint, args: ParserArgs, prove: boolean): Promise<ExecResult>
+export async function execQuery(db: Database, query: string, argsCommit: bigint, args: CircuitParams, prove: boolean): Promise<ExecResult>
 {
     const parser = new Parser();
     let {ast} = parser.parse(query)
@@ -69,28 +70,29 @@ export async function execQuery(db: Database, query: string, argsCommit: bigint,
         throw Error("bad query: unknown table");
     }
 
-    const tableState = db.exec(`SELECT * FROM ${tableName}`)[0];
-    tableState.columns.shift();
-    const tableHeader = tableState.columns.map((c) => args.headerMap.get(c)!);
-    const formattedTable = formatForCircuit(tableState.columns, formatSqlValues(tableState.values), args);
+    const {headerMap, tableValues} = getTable(db, tableName, args);
+    const tableColumns = Array.from(headerMap.values());
+
+    const tableCommit = tableCommitments.get(tableName)!;
 
     switch (ast.type) {
         case "select": {
-            const parsed = parseSelect(ast, args);
+            const parsed = parseSelect(ast, headerMap, args);
             if (Array.isArray(ast.columns)) {
                 ast.columns.unshift({expr: {type: "column_ref", table: null, column: "id"}, as: 'id'});
             }
             const selected = db.exec(parser.sqlify(ast))[0];
             selected.columns.shift();
             let formattedView = formatSqlValues(selected.values);
-            const results = formatForCircuit(selected.columns, formattedView, args);
+            const results = formatForCircuit(selected.columns, formattedView, headerMap, args);
 
             const result: ExecResult = {
+                tableName,
                 data: formattedView,
                 inputs: {
-                    header: tableHeader,
-                    table: formattedTable,
-                    tableCommit: tableCommitments.get(tableName)!,
+                    header: tableColumns,
+                    table: tableValues,
+                    tableCommit,
                     fields: parsed.fields,
                     whereConditions: parsed.whereConditions,
                     results
@@ -116,10 +118,11 @@ export async function execQuery(db: Database, query: string, argsCommit: bigint,
             const parsed = parseInsert(ast, args);
 
             const result: ExecResult = {
+                tableName,
                 inputs: {
-                    header: tableHeader,
-                    table: formattedTable,
-                    tableCommit: tableCommitments.get(tableName)!,
+                    header: tableColumns,
+                    table: tableValues,
+                    tableCommit,
                     insertValues: parsed.insertValues,
                     argsCommit: argsCommit,
                 }
@@ -138,20 +141,21 @@ export async function execQuery(db: Database, query: string, argsCommit: bigint,
             }
 
             if (ast.columns === null) {
-                ast.columns = Array.from(args.headerMap.keys());
+                ast.columns = Array.from(headerMap.keys());
             }
             db.run(parser.sqlify(ast));
 
             return result;
         }
         case "update": {
-            const parsed = parseUpdate(ast, args);
+            const parsed = parseUpdate(ast, headerMap, args);
 
             const result: ExecResult = {
+                tableName,
                 inputs: {
-                    header: tableHeader,
-                    table: formattedTable,
-                    tableCommit: tableCommitments.get(tableName)!,
+                    header: tableColumns,
+                    table: tableValues,
+                    tableCommit,
                     whereConditions: parsed.whereConditions,
                     setExpressions: parsed.setExpressions,
                     argsCommit: argsCommit,
@@ -175,13 +179,14 @@ export async function execQuery(db: Database, query: string, argsCommit: bigint,
             return result;
         }
         case "delete": {
-            const parsed = parseDelete(ast, args);
+            const parsed = parseDelete(ast, headerMap, args);
 
             const result: ExecResult = {
+                tableName,
                 inputs: {
-                    header: tableHeader,
-                    table: formattedTable,
-                    tableCommit: tableCommitments.get(tableName)!,
+                    header: tableColumns,
+                    table: tableValues,
+                    tableCommit,
                     whereConditions: parsed.whereConditions,
                     argsCommit: argsCommit,
                 }
@@ -208,7 +213,7 @@ export async function execQuery(db: Database, query: string, argsCommit: bigint,
     throw Error("unsupported query");
 }
 
-export async function commitToQuery(query: string, args: ParserArgs): Promise<{commit: bigint, table: string, type: string}>
+export async function commitToQuery(query: string, knownTables: Map<string, string[]>, args: CircuitParams): Promise<{commit: bigint, table: string, type: string}>
 {
     const parser = new Parser();
     let {ast} = parser.parse(query)
@@ -219,17 +224,23 @@ export async function commitToQuery(query: string, args: ParserArgs): Promise<{c
 
     const type = ast.type;
 
-    const table = parseTableName(ast);
-    if (table == null) {
+    const tableName = parseTableName(ast);
+    if (tableName == null) {
         throw Error("bad query: unknown table");
     }
 
-    const commit = await genArgsCommitment(ast, args);
+    const tableColumns = knownTables.get(tableName);
+    if (tableColumns === undefined) {
+        throw Error("unknown table");
+    }
 
-    return {commit, table, type};
+    const header = new Map<string, number>(tableColumns.map((c) => [c, tableColumns.indexOf(c)+1]));
+    const commit = await genArgsCommitment(ast, header, args);
+
+    return {commit, table: tableName, type};
 }
 
-export async function genArgsCommitment(ast: AST, args: ParserArgs): Promise<bigint>
+export async function genArgsCommitment(ast: AST, header: Map<string, number>, args: CircuitParams): Promise<bigint>
 {
     if (!("type" in ast)) {
         throw Error("bad query");
@@ -244,19 +255,32 @@ export async function genArgsCommitment(ast: AST, args: ParserArgs): Promise<big
             const insertParsed = parseInsert(ast, args);
             return poseidon.F.toObject(poseidon(insertParsed.insertValues));
         case "update":
-            const updParsed = parseUpdate(ast, args);
+            const updParsed = parseUpdate(ast, header, args);
             let flatExpressions = updParsed.setExpressions.flat();
             flatExpressions = flatExpressions.concat(...updParsed.whereConditions.flat());
             let updPreImage = flatExpressions.reduce((sum, x) => sum + x, 0n);
             return poseidon.F.toObject(poseidon([updPreImage]));
         case "delete":
-            const delParsed = parseDelete(ast, args);
+            const delParsed = parseDelete(ast, header, args);
             let delPreImage = delParsed.whereConditions.flat(2).reduce((sum, x) => sum + x, 0n);
 
             return poseidon.F.toObject(poseidon([delPreImage]));
     }
 
     throw Error("unsupported query");
+}
+
+function getTable(db: Database, tableName: string, args: CircuitParams): {
+    tableValues: bigint[][],
+    headerMap: Map<string, number>
+} {
+    const tableState = db.exec(`SELECT * FROM ${tableName}`)[0];
+    tableState.columns.shift();
+    const headerMap = new Map<string, number>(tableState.columns.map((c) => [c, tableState.columns.indexOf(c)+1]));
+    return {
+        tableValues: formatForCircuit(tableState.columns, formatSqlValues(tableState.values), headerMap, args),
+        headerMap
+    }
 }
 
 export function typeOfQuery(query: string): string {
@@ -282,17 +306,17 @@ export function parseTableName(ast: AST): string {
     throw Error("unsupported query");
 }
 
-export function formatForCircuit(columns: string[], values: SqlRow[], args: ParserArgs): bigint[][] {
+export function formatForCircuit(columns: string[], values: SqlRow[], header: Map<string, number>, args: CircuitParams): bigint[][] {
     let formatted = [];
-    const emptyRow = [...Array(args.headerMap.size)].map(_ => 0n);
-    const columnMap = Array.from(args.headerMap.keys())
+    const emptyRow = [...Array(header.size)].map(_ => 0n);
+    const columnMap = Array.from(header.keys())
         .map((column) => columns.indexOf(column));
 
     for (let i = 0; i < args.maxRows; i++) {
         let row = values.find((row) => row.idx == i + 1);
         if (row !== undefined) {
             let fRow = [];
-            for (let j = 0; j < args.headerMap.size; j++) {
+            for (let j = 0; j < header.size; j++) {
                 fRow.push(columnMap[j] > -1 ? encodeSqlValue(row.values[columnMap[j]]) : 0n);
             }
             formatted.push(fRow);

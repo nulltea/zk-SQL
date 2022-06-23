@@ -1,6 +1,7 @@
 import {BigNumber, Contract, providers, utils} from "ethers";
 import ZkSQL from "artifacts/contracts/zkSQL.sol/ZkSQL.json";
 import {ZkSQL as IZkSQL} from "../../typechain-types";
+import {tableCommitments} from "./engine";
 
 
 export let provider: any;
@@ -16,6 +17,11 @@ export async function listenToChain(address: string) {
     zkSqlContract.on("RequestPosted", (address: any, argsCommitment: BigNumber) => {
         pendingRequests.set(argsCommitment.toBigInt(), "");
         console.log("new pending request", argsCommitment.toBigInt());
+    });
+
+    zkSqlContract.on("TableUpdated", (table: string, newCommitment: BigNumber) => {
+        tableCommitments.set(table, newCommitment.toBigInt());
+        console.log(table, "table updated", newCommitment.toBigInt());
     });
 
     console.log("started listening...");

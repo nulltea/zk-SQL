@@ -1,8 +1,7 @@
 import {AST, Parser} from 'node-sql-parser/build/mysql'
 import exp = require("constants");
 
-export type ParserArgs = {
-    headerMap: Map<string, number>,
+export type CircuitParams = {
     maxOR: number,
     maxAND: number,
     maxRows: number,
@@ -81,19 +80,17 @@ class WhereCondition {
     }
 }
 
-export function parseSelect(ast: AST, args: ParserArgs): SelectQuery {
+export function parseSelect(ast: AST, header: Map<string, number>, args: CircuitParams): SelectQuery {
     let fields: bigint[] = [];
     let columns: string[] = [];
-
     if ("columns" in ast) {
         if (ast.columns === '*') {
-            fields = [...Array(args.headerMap.size)].map(_ => 1n);
-            columns = Array.from(args.headerMap.keys());
+            fields = [...Array(header.size)].map(_ => 1n);
+            columns = Array.from(header.keys());
         } else {
-            fields = [...Array(args.headerMap.size)].map(_ => 0n)
-
+            fields = [...Array(header.size)].map(_ => 0n)
             ast.columns!.forEach((cRef) => {
-                let columnIdx = args.headerMap.get(cRef.expr.column);
+                let columnIdx = header.get(cRef.expr.column);
                 if (columnIdx === undefined) {
                     throw Error("unknown column");
                 }
@@ -108,7 +105,7 @@ export function parseSelect(ast: AST, args: ParserArgs): SelectQuery {
 
     let where = new WhereCondition();
     if ("where" in ast && ast.where !== null) {
-        where = parseWhere(ast.where, args);
+        where = parseWhere(ast.where, header, args);
     }
 
     return {
@@ -118,7 +115,7 @@ export function parseSelect(ast: AST, args: ParserArgs): SelectQuery {
     }
 }
 
-export function parseInsert(ast: AST, args: ParserArgs): InsertQuery {
+export function parseInsert(ast: AST, args: CircuitParams): InsertQuery {
     if ("values" in ast && ast.values !== null && Array.isArray(ast.values)) {
         return {
             insertValues: ast.values[0].value.map((e) => "value" in e && typeof e.value === "number" ? e.value: 0)
@@ -128,19 +125,19 @@ export function parseInsert(ast: AST, args: ParserArgs): InsertQuery {
     throw Error("unsupported values expression");
 }
 
-export function parseUpdate(ast: AST, args: ParserArgs): UpdateQuery {
+export function parseUpdate(ast: AST, header: Map<string, number>, args: CircuitParams): UpdateQuery {
     let where = new WhereCondition();
     if ("where" in ast && ast.where !== null) {
-        where = parseWhere(ast.where, args);
+        where = parseWhere(ast.where, header, args);
     }
 
     let setExpressions = [];
     if ("set" in ast && ast.set !== null) {
-        for (let i = 0; i < args.headerMap.size; i++) {
-            let cond = ast.set.find((c) => args.headerMap.get(c.column) == i + 1);
+        for (let column of header.values()) {
+            let cond = ast.set.find((c) => header.get(c.column) == column);
             if (cond !== undefined) {
                 if ("value" in cond) {
-                    setExpressions.push([BigInt(i + 1), BigInt(cond.value.value)]);
+                    setExpressions.push([BigInt(column), BigInt(cond.value.value)]);
                 } else {
                     throw Error("unsupported set value");
                 }
@@ -156,10 +153,10 @@ export function parseUpdate(ast: AST, args: ParserArgs): UpdateQuery {
     }
 }
 
-export function parseDelete(ast: AST, args: ParserArgs): DeleteQuery {
+export function parseDelete(ast: AST, header: Map<string, number>, args: CircuitParams): DeleteQuery {
     let where = new WhereCondition();
     if ("where" in ast && ast.where !== null) {
-        where = parseWhere(ast.where, args);
+        where = parseWhere(ast.where, header, args);
     }
 
     return {
@@ -167,8 +164,8 @@ export function parseDelete(ast: AST, args: ParserArgs): DeleteQuery {
     }
 }
 
-function parseWhere(ast: any, args: ParserArgs): WhereCondition {
-    let condition = parseCondition(ast, args);
+function parseWhere(ast: any, header: Map<string, number>, args: CircuitParams): WhereCondition {
+    let condition = parseCondition(ast, header, args);
 
     if (condition instanceof Condition) {
         return new WhereCondition(new ANDCondition(condition));
@@ -179,18 +176,18 @@ function parseWhere(ast: any, args: ParserArgs): WhereCondition {
     return condition;
 }
 
-function parseCondition(ast: {operator: string, left: any, right: any}, args: ParserArgs): WhereCondition | ANDCondition | Condition {
+function parseCondition(ast: {operator: string, left: any, right: any}, header: Map<string, number>, args: CircuitParams): WhereCondition | ANDCondition | Condition {
     switch (ast.operator) {
         case 'OR': {
             let condition = new WhereCondition();
-            let leftCondition =  parseCondition(ast.left, args);
-            let rightCondition =  parseCondition(ast.right, args);
+            let leftCondition =  parseCondition(ast.left, header, args);
+            let rightCondition =  parseCondition(ast.right, header, args);
 
             if (leftCondition instanceof Condition) {
                 condition.conditions.push(new ANDCondition(leftCondition));
             } else if (leftCondition instanceof ANDCondition) {
                 condition.conditions.push(leftCondition);
-            } else if (leftCondition instanceof WhereCondition) {
+            } else {
                 condition.conditions.push(...leftCondition.conditions);
             }
 
@@ -206,8 +203,8 @@ function parseCondition(ast: {operator: string, left: any, right: any}, args: Pa
         }
         case 'AND': {
             let condition = new ANDCondition();
-            let leftCondition =  parseCondition(ast.left, args);
-            let rightCondition =  parseCondition(ast.right, args);
+            let leftCondition =  parseCondition(ast.left, header, args);
+            let rightCondition =  parseCondition(ast.right, header, args);
 
             if (leftCondition instanceof Condition) {
                 condition.conditions.push(leftCondition);
@@ -226,7 +223,7 @@ function parseCondition(ast: {operator: string, left: any, right: any}, args: Pa
             return condition;
         }
         case '=': {
-            let columnIdx = args.headerMap.get(ast.left.column);
+            let columnIdx = header.get(ast.left.column);
             if (columnIdx === undefined) {
                 throw Error("unknown column");
             }
