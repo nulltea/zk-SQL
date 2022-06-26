@@ -3,7 +3,7 @@ import {Contract, providers} from "ethers";
 import {ZkSQL as IZkSQL} from "../../typechain-types";
 import {CircuitParams} from "../engine/parser";
 import {commitToQuery} from "../engine/engine";
-import {SqlResponse, ApiError} from "../controllers/api";
+import {SqlResponse} from "../controllers/api";
 import {genPublicSignals, verifyProof} from "../engine/verify";
 
 

@@ -1,7 +1,7 @@
 import {ClientConfig} from "../../../server/src/client/client";
 
 export const clientConfig: ClientConfig = {
-  serverAddress: "http://0.0.0.0:8083",
+  serverAddress: process.env.SERVER_ADDRESS!,
   circuitParams: {
     maxAND: 5, maxOR: 2, maxRows: 10,
   },

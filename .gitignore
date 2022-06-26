@@ -19,3 +19,5 @@ verifier.sol
 
 **/circuits/build
 **/typechain-types
+
+server/dist

@@ -20,6 +20,7 @@
     "noEmit": true,
     "esModuleInterop": true,
     "resolveJsonModule": true,
+    "skipLibCheck": true,
     "lib": [
       "es7",
       "dom",
