@@ -1,8 +1,8 @@
 import { useSnapshot } from 'valtio';
-import { accountState } from '../../store/auth';
+import { loggedInState } from '../../store/auth';
 
 export const useAccount = () => {
-  const account = useSnapshot(accountState);
+  const account = useSnapshot(loggedInState);
 
   return account;
 };

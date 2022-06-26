@@ -82,7 +82,7 @@ export function TablesSelector() {
       <Grid templateColumns='repeat(5, 1fr)' gap={6}>
         {
           tables.map((table) => {
-            return <GridItem w='100%' h='10'>
+            return <GridItem w='100%' h='10' key={table}>
               <CardWrapper mb={4} cursor='pointer'>
                 <Link href={`table?name=${table}`}>
                   {table}
@@ -129,7 +129,7 @@ export function TablesSelector() {
               </Flex>
             )}
             <form onSubmit={handleSubmit(createTable)}>
-                <FormControl isInvalid={errors.name}>
+                <FormControl>
                   <Input
                     id='name'
                     placeholder='table2'

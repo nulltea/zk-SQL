@@ -254,7 +254,7 @@ export async function genArgsCommitment(ast: AST, header: Map<string, number>, a
 
     switch (ast.type) {
         case "select":
-            return 0n;
+            return BigInt(0);
         case "insert":
             const insertParsed = parseInsert(ast, args);
             return poseidon.F.toObject(poseidon(insertParsed.insertValues));

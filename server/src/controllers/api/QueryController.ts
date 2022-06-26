@@ -64,7 +64,7 @@ export class QueryController {
         changeCommit: type != "select" ? res.publicInputs![0].toString() : undefined,
         proof: res.proof!,
       }
-    } catch (e) {
+    } catch (e: any) {
       await initDB(true);
       return {
         error: e.toString()

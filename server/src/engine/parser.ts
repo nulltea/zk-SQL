@@ -1,5 +1,4 @@
-import {AST, Parser} from 'node-sql-parser/build/mysql'
-import exp = require("constants");
+import {AST, Parser} from 'node-sql-parser/build/mysql';
 
 export type CircuitParams = {
     maxOR: number,

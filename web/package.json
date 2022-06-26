@@ -1,7 +1,7 @@
 {
-  "name": "nextjs-dapp-template",
+  "name": "zk-sql-dapp",
   "version": "1.1.0",
-  "author": "Julian Ćwirko <julian.io>",
+  "author": "timofey luin <timofey@chainsafe.io>",
   "license": "MIT",
   "homepage": "https://github.com/ElrondDevGuild/nextjs-dapp-template",
   "repository": {

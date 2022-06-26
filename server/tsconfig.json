@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
+    "target": "es2021",
     "baseUrl": ".",
     "module": "commonjs",
-    "target": "esnext",
     "sourceMap": true,
     "declaration": false,
     "experimentalDecorators": true,
@@ -37,6 +37,7 @@
     "test"
   ],
   "linterOptions": {
-    "exclude": []
+    "exclude": [
+    ]
   }
 }

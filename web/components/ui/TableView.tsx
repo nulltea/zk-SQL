@@ -81,10 +81,10 @@ export const TableView : FC<LoginModalButtonProps> = ({tableName}) => {
       <CardWrapper mb={4}>
       <Table {...getTableProps()}>
         <Thead>
-          {headerGroups.map((headerGroup) => (
-            <Tr {...headerGroup.getHeaderGroupProps()}>
-              {headerGroup.headers.map((column) => (
-                <Th {...column.getHeaderProps(column.getHeaderProps())}>
+          {headerGroups.map((headerGroup, key) => (
+            <Tr {...headerGroup.getHeaderGroupProps()} key={key}>
+              {headerGroup.headers.map((column, key) => (
+                <Th {...column.getHeaderProps(column.getHeaderProps())} key={key}>
                   {column.render('Header')}
                 </Th>
               ))}
@@ -92,12 +92,12 @@ export const TableView : FC<LoginModalButtonProps> = ({tableName}) => {
           ))}
         </Thead>
         <Tbody {...getTableBodyProps()}>
-          {rows.map((row) => {
+          {rows.map((row, key) => {
             prepareRow(row)
             return (
-              <Tr {...row.getRowProps()}>
-                {row.cells.map((cell) => (
-                  <Td {...cell.getCellProps()}>
+              <Tr {...row.getRowProps()} key={key}>
+                {row.cells.map((cell, key) => (
+                  <Td {...cell.getCellProps()} key={key}>
                     {cell.render('Cell')}
                   </Td>
                 ))}
@@ -110,7 +110,7 @@ export const TableView : FC<LoginModalButtonProps> = ({tableName}) => {
       <Box h='10px'/>
       <form onSubmit={handleSubmit(makeQuery)}>
         <Flex>
-          <FormControl isInvalid={errors.name}>
+          <FormControl>
             <Input
               id='sql'
               placeholder={`SELECT * FROM ${tableName}`}
