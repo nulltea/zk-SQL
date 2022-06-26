@@ -17,5 +17,5 @@ artifacts
 verification_key.json
 verifier.sol
 
-circuits/build
-typechain-types
+**/circuits/build
+**/typechain-types
