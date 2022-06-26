@@ -60,6 +60,11 @@
     "eslint-config-prettier": "8.5.0",
     "eslint-plugin-valtio": "0.4.2",
     "prettier": "2.5.1",
-    "typescript": "4.5.4"
-  }
+    "typescript": "4.5.4",
+    "zk-sql": "1.0.0"
+  },
+  "workspaces": [
+    "../server",
+    "web"
+  ]
 }
