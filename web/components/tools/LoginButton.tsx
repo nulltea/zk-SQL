@@ -5,21 +5,10 @@ import { useLogin } from '../../hooks/auth/useLogin';
 import {AccountLabel} from "../ui/AccountLabel";
 
 interface LoginModalButtonProps {
-  onClose?: () => void;
-  onOpen?: () => void;
 }
 
-export const LoginButton: FC<LoginModalButtonProps> = ({
-  onClose,
-  onOpen,
-}) => {
+export const LoginButton: FC<LoginModalButtonProps> = ({ }) => {
   const { isLoggedIn, address, login } = useLogin();
-
-  useEffectOnlyOnUpdate(() => {
-    if (isLoggedIn) {
-      close();
-    }
-  }, [isLoggedIn]);
 
   return (
     <>
