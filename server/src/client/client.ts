@@ -14,7 +14,7 @@ export type ClientConfig = {
     circuitsPath?: string
 }
 
-export async function makeSqlRequest(sql: string, cfg: ClientConfig): Promise<SqlResponse> {
+export async function postSqlRequest(sql: string, cfg: ClientConfig): Promise<bigint> {
     const provider = new providers.JsonRpcProvider(process.env.CHAIN_RPC)
     const contract = new Contract(process.env.ZK_SQL_CONTRACT!, ZkSQL.abi)
     const contractOwner = contract.connect(provider) as IZkSQL;
@@ -30,7 +30,7 @@ export async function makeSqlRequest(sql: string, cfg: ClientConfig): Promise<Sq
     }
     const tableHeader = new Map<string, number>(tableColumns.map((c) => [c, tableColumns.indexOf(c)+1]));
 
-    const res = await fetch(`${cfg.serverAddress}/api/query`, {
+    const res = await fetch(`${cfg.serverAddress}/api/request`, {
         method: "POST",
         headers: {
             'Content-Type': 'application/json'
@@ -45,23 +45,30 @@ export async function makeSqlRequest(sql: string, cfg: ClientConfig): Promise<Sq
         throw Error(res.statusText);
     }
 
+    // let publicSignals = genPublicSignals(
+    //     sql,
+    //     commit,
+    //     tableHeader,
+    //     cfg.circuitParams,
+    //     tableCommit,
+    //     respBody.selected != null ? respBody.selected.values : respBody.changeCommit
+    // );
+
+    return commit;
+}
+
+
+export async function getSqlRequest(token: bigint, cfg: ClientConfig): Promise<SqlResponse | null> {
+    const res = await fetch(`${cfg.serverAddress}/api/query/${token}`);
+
+    if (!res.ok) {
+        throw Error(res.statusText);
+    }
+
     let respBody: SqlResponse = await res.json();
 
     if (respBody.error != null) {
         throw Error(respBody.error);
-    }
-
-    let publicSignals = genPublicSignals(
-        sql,
-        commit,
-        tableHeader,
-        cfg.circuitParams,
-        tableCommit,
-        respBody.selected != null ? respBody.selected.values : respBody.changeCommit
-    );
-
-    if (!await verifyProof(type, publicSignals, respBody.proof, cfg.circuitsPath)) {
-        throw Error("invalid proof");
     }
 
     return respBody;

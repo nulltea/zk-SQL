@@ -1,11 +1,21 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import {ClientConfig, makeSqlRequest} from "../../../../server/src/client/client";
+import {ClientConfig, getSqlRequest} from "../../../../server/src/client/client";
 import {clientConfig} from "../config";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-const {sql} = JSON.parse(req.body);
+  const {token} = JSON.parse(req.body);
   try {
-    const {selected, changeCommit, proof} = await makeSqlRequest(sql, clientConfig);
+    const {ready, selected, changeCommit, proof} = await getSqlRequest(BigInt(token), clientConfig);
+
+    console.log(ready, selected, changeCommit, proof);
+
+    if (!ready) {
+      res.json({
+        ready: false,
+      });
+
+      return;
+    }
 
     if (selected != null) {
       const columns = selected.columns.map((col) => {
@@ -23,6 +33,7 @@ const {sql} = JSON.parse(req.body);
         )});
 
       res.json({
+        ready: true,
         selected: {
           columns,
           values,
@@ -31,6 +42,7 @@ const {sql} = JSON.parse(req.body);
       });
     } else {
       res.json({
+        ready: true,
         changeCommit,
         proof,
       });

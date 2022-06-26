@@ -58,20 +58,35 @@ export const TableView : FC<LoginModalButtonProps> = ({tableName}) => {
         return values.sql;
       }).then((sql) => {
         setLoading(true);
-        fetch('/api/table/query', {
+        fetch('/api/table/request', {
           method: 'POST',
           body: JSON.stringify({
             sql
           })
         }).then((res) => res.json())
-        .then(({selected, changeCommit, proof}) => {
-          if (selected != null) {
-            setColumns(selected.columns);
-            setValues(selected.values);
-          }
-          setLoading(false)
-        });
+        .then(({token}) => poll(token));
     });
+  }
+
+  async function poll(token: string) {
+    let res: {ready: any, selected: any, changeCommit: any, proof: any} = await fetch('/api/table/query', {
+      method: 'POST',
+      body: JSON.stringify({
+        token
+      })
+    }).then((res) => res.json());
+
+    console.log("ready:", res);
+
+    if (!res.ready) {
+      return new Promise(resolve => setTimeout(resolve, 1000)).then(() => poll(token));
+    }
+
+    if (res.selected != null) {
+      setColumns(res.selected.columns);
+      setValues(res.selected.values);
+    }
+    setLoading(false);
   }
 
   if (isLoading) return <p>Loading...</p>
