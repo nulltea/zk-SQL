@@ -10,6 +10,7 @@
     "test:lint": "eslint '**/*.{ts,js}'",
     "test:lint:fix": "eslint '**/*.{ts,js}' --fix"
   },
+  "private": true,
   "dependencies": {
     "@tsed/ajv": "^6.114.17",
     "@tsed/common": "^6.114.17",
