@@ -18,7 +18,6 @@ export const setLoggedInState = (value: LoggedInState) => {
   loggedInState.isLoggedIn = value.isLoggedIn;
   loggedInState.addressIndex = value.addressIndex;
   loggedInState.address = value.address;
-
 };
 
 export const clearLoggingInState = () => {

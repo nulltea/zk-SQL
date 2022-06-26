@@ -1,5 +1,6 @@
 import NextLink from 'next/link';
 import { Box, Text } from '@chakra-ui/react';
+import Link from "next/link";
 
 export const Logo = () => {
   return (
@@ -11,16 +12,18 @@ export const Logo = () => {
         position="relative"
         userSelect="none"
       >
-        <Text
-          as="span"
-          cursor="pointer"
-          mb={0}
-          fontSize="4xl"
-          fontWeight="black"
-          color="dappTemplate.white"
-        >
-          zk-SQL
-        </Text>
+        <Link href='/'>
+          <Text
+            as="span"
+            cursor="pointer"
+            mb={0}
+            fontSize="4xl"
+            fontWeight="black"
+            color="dappTemplate.white"
+          >
+            zk-SQL
+          </Text>
+        </Link>
       </Box>
     </NextLink>
   );

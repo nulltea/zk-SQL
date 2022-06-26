@@ -9,6 +9,7 @@ interface IVerifier {
 contract ZkSQL {
     enum SqlOperation{ INSERT, UPDATE, DELETE }
     event RequestPosted(address issuer, uint256 commitment);
+    event TableCreated(string table, uint256 commitment);
     event TableUpdated(string table, uint256 commitment);
 
     address public immutable insertVerifier;
@@ -22,6 +23,14 @@ contract ZkSQL {
         updateVerifier = updateVerifier_;
         deleteVerifier = deleteVerifier_;
         tableCommitments["table1"] = 6192063684007625405622444875231245009508356906093894343979231563958794510376;
+    }
+
+    function createTable(string memory table, uint256 commitment)
+        public
+    {
+        require(tableCommitments[table] == 0, "table already exists");
+        tableCommitments[table] = commitment;
+        emit TableCreated(table, commitment);
     }
 
     function request(string memory table, uint256 argsCommitment)

@@ -6,7 +6,6 @@ export const useLogin = () => {
   const {isLoggedIn, address} = useSnapshot(loggedInState);
 
   const login = async () => {
-    console.log("login");
     if(!window.ethereum) {
       alert("please install MetaMask")
       return

@@ -5,6 +5,7 @@ import { HeaderMenuButtons } from '../components/ui/HeaderMenuButtons';
 import { CardWrapper } from '../components/ui/CardWrapper';
 import {TableView} from "../components/ui/TableView";
 import {TablesSelector} from "../components/ui/TablesSelector";
+import {useRouter} from "next/router";
 
 declare global {
   interface Window{
@@ -12,15 +13,19 @@ declare global {
   }
 }
 
-const Home: NextPage = () => {
+const Table: NextPage = () => {
+  const router = useRouter()
+  const { name } = router.query;
+
   return (
     <MainLayout>
       <HeaderMenu>
         <HeaderMenuButtons enabled={['auth']} />
       </HeaderMenu>
-        <TablesSelector/>
+      <TableView tableName={(name ?? "table1").toString()}/>
     </MainLayout>
   );
 };
 
-export default Home;
+export default Table;
+

@@ -1,8 +1,4 @@
-import {assert} from "chai";
-import {CircuitParams} from "../src/engine/parser";
-import {initDB} from "../src/engine/database";
 import {ClientConfig, makeSqlRequest} from "../src/client/client";
-import {tableCommitments} from "../src/engine/engine";
 
 describe("zk-SQL - API", () => {
     const clientConfig: ClientConfig = {

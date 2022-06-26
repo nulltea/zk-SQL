@@ -4,12 +4,13 @@ import { ethers } from "hardhat";
 const {plonk} = require("snarkjs");
 import {CircuitParams} from "../src/engine/parser"
 import initSqlJs, {Database} from "sql.js";
-import {genArgsCommitment, execQuery, tableCommitments, commitToQuery} from "../src/engine/engine";
+import {genArgsCommitment, execQuery, commitToQuery} from "../src/engine/engine";
 import {ZkSQL, } from "../typechain-types/zkSQL.sol";
 import {PlonkVerifier as InsertVerifier} from "../typechain-types/insertVerifier.sol";
 import {PlonkVerifier as UpdateVerifier} from "../typechain-types/updateVerifier.sol";
 import {PlonkVerifier as DeleteVerifier} from "../typechain-types/deleteVerifier.sol";
 import {db, initDB} from "../src/engine/database";
+import {tableCommitments} from "../src/engine/chainListener";
 
 describe("zk-SQL - Contracts", () => {
     let insertVerifier: InsertVerifier;

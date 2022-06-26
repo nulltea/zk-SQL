@@ -2,6 +2,7 @@ import {parseDelete, parseInsert, CircuitParams, parseSelect, parseUpdate} from 
 import {AST, Parser} from "node-sql-parser/build/mysql";
 import {Database, SqlValue} from "sql.js";
 import {ethers} from "ethers";
+import {tableCommitments} from "./chainListener";
 const {plonk} = require("snarkjs");
 const buildPoseidon = require("circomlibjs").buildPoseidon;
 
@@ -38,9 +39,6 @@ type DeleteCircuitInputs = {
     whereConditions: bigint[][][],
     argsCommit: bigint,
 }
-
-// this should be replaced by on-chain request
-export const tableCommitments = new Map<string, bigint>()
 
 export type SqlRow = {
     idx: number,

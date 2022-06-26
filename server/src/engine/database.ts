@@ -1,7 +1,7 @@
 import initSqlJs, {Database} from "sql.js";
 import * as fs from "fs";
 
-type Table = {
+export type Table = {
     name: string,
     columns: string[],
     values: number[][]
@@ -35,4 +35,11 @@ export function writeDB() {
     const data = db.export();
     const buffer = Buffer.from(data);
     fs.writeFileSync(dbCacheFile, buffer);
+}
+
+export function createTable(table: Table) {
+    db.run(`CREATE TABLE ${table.name} (id INTEGER PRIMARY KEY AUTOINCREMENT, ${table.columns.map((c) => [c, "int"].join(' '))})`);
+    table.values?.forEach((row) => {
+        db.run(`INSERT INTO table1 (${table.columns.join(',')}) VALUES (${row.join(", ")})`);
+    });
 }

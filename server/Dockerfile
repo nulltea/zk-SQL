@@ -1,31 +1,16 @@
-###############################################################################
-###############################################################################
-##                      _______ _____ ______ _____                           ##
-##                     |__   __/ ____|  ____|  __ \                          ##
-##                        | | | (___ | |__  | |  | |                         ##
-##                        | |  \___ \|  __| | |  | |                         ##
-##                        | |  ____) | |____| |__| |                         ##
-##                        |_| |_____/|______|_____/                          ##
-##                                                                           ##
-## description     : Dockerfile for TsED Application                         ##
-## author          : TsED team                                               ##
-## date            : 2022-03-05                                              ##
-## version         : 2.0                                                     ##
-##                                                                           ##
-###############################################################################
-###############################################################################
-ARG NODE_VERSION=16.13.1
+ARG NODE_VERSION=18.4.0
 
 FROM node:${NODE_VERSION}-alpine as build
 WORKDIR /opt
 
-COPY package.json yarn.lock tsconfig.json tsconfig.compile.json .barrelsby.json ./
+COPY package.json package-lock.json tsconfig.json tsconfig.compile.json .barrelsby.json ./
 
-RUN yarn install --pure-lockfile
+RUN apk add g++ make py3-pip
+RUN npm install
 
-COPY ./src ./src
+COPY . .
 
-RUN yarn build
+RUN npm run build
 
 FROM node:${NODE_VERSION}-alpine as runtime
 ENV WORKDIR /opt
@@ -38,7 +23,6 @@ COPY --from=build /opt .
 
 RUN yarn install --pure-lockfile --production
 
-COPY ./views ./views
 COPY processes.config.js .
 
 EXPOSE 8081

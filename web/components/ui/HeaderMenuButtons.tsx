@@ -1,7 +1,7 @@
 import { Box } from '@chakra-ui/react';
 import { FC } from 'react';
 import { SocialMediaIcons } from './SocialMediaIcons';
-import { LoginModalButton } from '../tools/LoginModalButton';
+import { LoginButton } from '../tools/LoginButton';
 
 interface HeaderMenuButtonsProps {
   enabled: string[];
@@ -20,7 +20,7 @@ export const HeaderMenuButtons: FC<HeaderMenuButtonsProps> = ({ enabled }) => {
       }}
     >
       <SocialMediaIcons />
-      {enabled.includes('auth') && <LoginModalButton />}
+      {enabled.includes('auth') && <LoginButton />}
     </Box>
   );
 };

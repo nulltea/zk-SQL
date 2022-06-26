@@ -1,8 +1,8 @@
-import { Box, BoxProps } from '@chakra-ui/react';
+import { Box, BoxProps, Button, ButtonProps } from '@chakra-ui/react';
 import { FC, useCallback } from 'react';
 
-interface ActionButtonProps extends BoxProps {
-  onClick: () => void;
+interface ActionButtonProps extends ButtonProps {
+  onClick?: () => void;
   isFullWidth?: boolean;
   disabled?: boolean;
 }
@@ -21,7 +21,7 @@ export const ActionButton: FC<ActionButtonProps> = ({
   }, [disabled, onClick]);
 
   return (
-    <Box
+    <Button
       as="button"
       borderColor="dappTemplate.color2.darker"
       borderWidth={2}
@@ -41,6 +41,6 @@ export const ActionButton: FC<ActionButtonProps> = ({
       {...props}
     >
       {children}
-    </Box>
+    </Button>
   );
 };

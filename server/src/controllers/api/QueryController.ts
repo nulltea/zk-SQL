@@ -1,13 +1,12 @@
 import {Controller} from "@tsed/di";
 import {Post} from "@tsed/schema";
 import {BodyParams} from "@tsed/platform-params";
-import {execQuery, SqlRow, tableCommitments, typeOfQuery} from "../../engine/engine";
-import {db, writeDB} from "../../engine/database";
+import {execQuery, SqlRow, typeOfQuery} from "../../engine/engine";
+import {db, initDB, writeDB} from "../../engine/database";
 import {CircuitParams} from "../../engine/parser";
-import {getSqlOpcode, pendingRequests, provider, zkSqlContract} from "../../engine/chainListener";
+import {getSqlOpcode, pendingRequests, provider, tableCommitments, zkSqlContract} from "../../engine/chainListener";
 import {backOff} from "exponential-backoff";
 import {Mutex} from 'async-mutex';
-
 
 type SqlRequest = {
   sql: string
@@ -20,7 +19,8 @@ export type SqlResponse = {
     values: SqlRow[]
   },
   changeCommit?: string
-  proof: any,
+  proof?: any,
+  error?: string
 }
 
 const circuitParams: CircuitParams = {
@@ -34,34 +34,41 @@ const mutex = new Mutex();
 export class QueryController {
   @Post()
   async updatePayload(@BodyParams() payload: SqlRequest): Promise<SqlResponse> {
-    const release = await mutex.acquire();
-    const type = typeOfQuery(payload.sql);
-    const argsCommit = BigInt(payload.commit);
+    try {
+      const release = await mutex.acquire();
+      const type = typeOfQuery(payload.sql);
+      const argsCommit = BigInt(payload.commit);
 
-    if (type != "select") {
-      await backOff(async () => {
-        if (!pendingRequests.has(argsCommit)) {
-          throw Error("unknown request, commit to on-chain");
-        }
-      })
-    }
+      if (type != "select") {
+        await backOff(async () => {
+          if (!pendingRequests.has(argsCommit)) {
+            throw Error("unknown request, commit to on-chain");
+          }
+        })
+      }
 
-    let res = await execQuery(db, payload.sql, argsCommit, circuitParams, true);
+      let res = await execQuery(db, payload.sql, argsCommit, circuitParams, true);
 
-    if (type != "select") {
-      writeDB();
-      const newCommitment = res.publicInputs![0];
-      await zkSqlContract.execRequest(getSqlOpcode(type), argsCommit, newCommitment, res.solidityProof!)
-      tableCommitments.set(res.tableName, argsCommit);
-      await delay(1000);
-    }
+      if (type != "select") {
+        const newCommitment = res.publicInputs![0];
+        await zkSqlContract.execRequest(getSqlOpcode(type), argsCommit, newCommitment, res.solidityProof!)
+        tableCommitments.set(res.tableName, argsCommit);
+        await delay(1000);
+        writeDB();
+      }
 
-    release();
+      release();
 
-    return {
-      selected: res.selected,
-      changeCommit: type != "select" ? res.publicInputs![0].toString() : undefined,
-      proof: res.proof!,
+      return {
+        selected: res.selected,
+        changeCommit: type != "select" ? res.publicInputs![0].toString() : undefined,
+        proof: res.proof!,
+      }
+    } catch (e) {
+      await initDB(true);
+      return {
+        error: e.toString()
+      }
     }
   }
 }

@@ -12,7 +12,6 @@ import "@tsed/swagger";
 import {config} from "./config";
 import * as rest from "./controllers/api";
 import {initDB} from "./engine/database";
-import {tableCommitments} from "./engine/engine";
 import {listenToChain} from "./engine/chainListener";
 import {ethers} from "hardhat";
 import {PlonkVerifier as InsertVerifier} from "../typechain-types/insertVerifier.sol";
@@ -69,8 +68,7 @@ export class Server implements BeforeInit {
         [5, 4, 7, 8, 9],
       ]
     });
-    tableCommitments.set("table1", 6192063684007625405622444875231245009508356906093894343979231563958794510376n);
-    await listenToChain("0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9");
+    await listenToChain(process.env.ZK_SQL_CONTRACT!);
   }
 }
 

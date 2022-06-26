@@ -52,14 +52,14 @@ const NextJSDappTemplate = ({ Component, pageProps }: AppProps) => {
 };
 ```
 
-#### LoginModalButton
+#### LoginButton
 
 The component provides the `Connect` button with the modal, which will contain another three buttons for four different authentication possibilities (Maiar Mobile App, Maiar Defi Wallet - browser extension, Elrond Web Wallet). You should be able to use it in any place on the website.
 
 ```jsx
-import { LoginModalButton } from '../tools/LoginModalButton';
+import { LoginButton } from '../tools/LoginButton';
 
-<LoginModalButton />
+<LoginButton />
 ```
 
 #### Authenticated
@@ -81,7 +81,7 @@ It can display the spinner and also the fallback React element.
         Connect your wallet!
       </Text>
       <Flex mt={4} justifyContent="center">
-        <LoginModalButton />
+        <LoginButton />
       </Flex>
     </>
   }

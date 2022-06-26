@@ -3,7 +3,7 @@ import {Contract, providers} from "ethers";
 import {ZkSQL as IZkSQL} from "../../typechain-types";
 import {CircuitParams} from "../engine/parser";
 import {commitToQuery} from "../engine/engine";
-import {SqlResponse} from "../controllers/api";
+import {SqlResponse, ApiError} from "../controllers/api";
 import {genPublicSignals, verifyProof} from "../engine/verify";
 
 
@@ -15,14 +15,14 @@ export type ClientConfig = {
 }
 
 export async function makeSqlRequest(sql: string, cfg: ClientConfig): Promise<SqlResponse> {
-    const provider = new providers.JsonRpcProvider("http://localhost:8545")
-    const contract = new Contract("0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9", ZkSQL.abi)
-    const contractOwner = contract.connect(provider.getSigner()) as IZkSQL;
+    const provider = new providers.JsonRpcProvider(process.env.CHAIN_RPC)
+    const contract = new Contract(process.env.ZK_SQL_CONTRACT!, ZkSQL.abi)
+    const contractOwner = contract.connect(provider) as IZkSQL;
     const {commit, table, type} = await commitToQuery(sql, cfg.knownTables, cfg.circuitParams);
     const tableCommit = (await contractOwner.tableCommitments(table)).toBigInt();
-    if (type != "select") {
-        await contractOwner.request(table, commit);
-    }
+    // if (type != "select") {
+    //     await contractOwner.request(table, commit);
+    // }
 
     const tableColumns = cfg.knownTables.get(table);
     if (tableColumns === undefined) {
@@ -46,6 +46,11 @@ export async function makeSqlRequest(sql: string, cfg: ClientConfig): Promise<Sq
     }
 
     let respBody: SqlResponse = await res.json();
+
+    if (respBody.error != null) {
+        throw Error(respBody.error);
+    }
+
     let publicSignals = genPublicSignals(
         sql,
         commit,

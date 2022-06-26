@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import {ClientConfig, makeSqlRequest} from "../../../server/src/client/client";
+import {ClientConfig, makeSqlRequest} from "../../../../server/src/client/client";
 
 const clientConfig: ClientConfig = {
   serverAddress: "http://0.0.0.0:8083",
@@ -31,17 +31,24 @@ const {sql} = JSON.parse(req.body);
             row.values.entries(),
           ([index, v]) => [selected.columns.at(index), v])
         )});
+
       res.json({
-        columns,
-        values,
+        selected: {
+          columns,
+          values,
+        },
+        proof,
+      });
+    } else {
+      res.json({
+        changeCommit,
+        proof,
       });
     }
-
-
   } catch (error: any) {
+    console.log(error);
     const { message } = JSON.parse(error.body).error
     const reason = message.substring(message.indexOf("'") + 1, message.lastIndexOf("'"))
-
     res.status(500).send(reason || "Unknown error!")
   }
 }

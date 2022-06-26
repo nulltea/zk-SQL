@@ -6,8 +6,9 @@ const buildPoseidon = require("circomlibjs").buildPoseidon;
 exports.p = ff.Scalar.fromString("21888242871839275222246405745257275088548364400416034343698204186575808495617");
 const Fr = new ff.F1Field(exports.p);
 import {CircuitParams} from "../src/engine/parser"
-import {commitToQuery, execQuery, tableCommitments} from "../src/engine/engine";
+import {commitToQuery, execQuery} from "../src/engine/engine";
 import {db, initDB} from "../src/engine/database";
+import {tableCommitments} from "../src/engine/chainListener";
 
 describe("zk-SQL - Circuits", () => {
     let selectCircuit: any;

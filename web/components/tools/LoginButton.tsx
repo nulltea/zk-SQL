@@ -1,14 +1,3 @@
-import {
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  Text,
-  ModalBody,
-  ModalCloseButton,
-  useDisclosure,
-  Spinner,
-  Flex,
-} from '@chakra-ui/react';
 import { FC } from 'react';
 import { ActionButton } from '../tools/ActionButton';
 import { useEffectOnlyOnUpdate } from '../../hooks/tools/useEffectOnlyOnUpdate';
@@ -20,11 +9,7 @@ interface LoginModalButtonProps {
   onOpen?: () => void;
 }
 
-const CustomModalOverlay = () => {
-  return <ModalOverlay bg="blackAlpha.700" backdropFilter="blur(5px)" />;
-};
-
-export const LoginModalButton: FC<LoginModalButtonProps> = ({
+export const LoginButton: FC<LoginModalButtonProps> = ({
   onClose,
   onOpen,
 }) => {
