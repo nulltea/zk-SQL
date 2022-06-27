@@ -1,5 +1,5 @@
 import React, {FC, useEffect, useState} from "react";
-import { useForm } from 'react-hook-form';
+import {useForm} from 'react-hook-form';
 import {
   FormErrorMessage,
   FormControl,
@@ -10,34 +10,46 @@ import {
   Input,
   Box,
   Flex,
-  Button
+  Button,
 } from '@chakra-ui/react'
-import { useTable } from 'react-table';
-import {CardWrapper} from "./CardWrapper";
+import {CheckIcon} from "@chakra-ui/icons";
+import {useTable} from 'react-table';
+import {CardWrapper, FlexCardWrapper} from "./CardWrapper";
 import ZkSQL from "../../../server/artifacts/contracts/zkSQL.sol/ZkSQL.json";
 import {ZkSQL as IZkSQL} from "../../../server/typechain-types";
 import {Contract, ethers} from "ethers";
+import {useRouter} from "next/router";
+import {SqlQueryResult} from "zk-sql/src/client/client";
 
-interface LoginModalButtonProps {
-  tableName: string
+interface TableViewProps {
 }
 
-export const TableView : FC<LoginModalButtonProps> = ({tableName}) => {
+export const TableView: FC<TableViewProps> = () => {
+  const router = useRouter()
+  const [tableName, setTableName] = useState("")
   const [columns, setColumns] = useState([]);
   const [values, setValues] = useState([]);
-  const [isLoading, setLoading] = useState(false)
+  const [isLoading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [proof, setProof] = useState(null);
+  const [publicSignals, setPublicSignals] = useState([]);
 
-  const { getTableProps, getTableBodyProps, headerGroups, rows, prepareRow } =
-    useTable({ columns, data: values });
+  const {getTableProps, getTableBodyProps, headerGroups, rows, prepareRow} =
+    useTable({columns, data: values});
 
   useEffect(() => {
-    makeQuery({sql: `SELECT * FROM ${tableName}`});
-  }, []);
+    if (!router.isReady) return;
+    const {name} = router.query;
+    setTableName(name.toString());
+    makeQuery({
+      sql: `SELECT * FROM ${name.toString()}`
+    });
+  }, [router.isReady]);
 
   const {
     handleSubmit,
     register,
-    formState: { errors, isSubmitting },
+    formState: {errors, isSubmitting},
   } = useForm()
 
   async function makeQuery(values: { sql: string }) {
@@ -49,7 +61,6 @@ export const TableView : FC<LoginModalButtonProps> = ({tableName}) => {
     }).then((res) => res.json())
       .then(({commitExpected, table, commit}) => {
         if (commitExpected) {
-          console.log(process.env.NEXT_PUBLIC_ZK_SQL_CONTRACT!);
           const contract = new Contract(process.env.NEXT_PUBLIC_ZK_SQL_CONTRACT!, ZkSQL.abi);
           const provider = new ethers.providers.Web3Provider(window.ethereum);
           const contractOwner = contract.connect(provider.getSigner()) as IZkSQL;
@@ -57,78 +68,113 @@ export const TableView : FC<LoginModalButtonProps> = ({tableName}) => {
         }
         return values.sql;
       }).then((sql) => {
-        setLoading(true);
-        fetch('/api/table/request', {
-          method: 'POST',
-          body: JSON.stringify({
-            sql
-          })
-        }).then((res) => res.json())
-        .then(({token}) => poll(token));
+      setLoading(true);
+      fetch('/api/table/request', {
+        method: 'POST',
+        body: JSON.stringify({
+          sql
+        })
+      }).then((res) => res.json())
+        .then(({token, error}) => {
+          if (error != null) {
+            setError(error);
+            setLoading(false);
+            return;
+          }
+          poll(sql, token)
+        });
     });
   }
 
-  async function poll(token: string) {
-    let res: {ready: any, selected: any, changeCommit: any, proof: any} = await fetch('/api/table/query', {
+  async function poll(sql: string, token: string) {
+    let res: SqlQueryResult = await fetch('/api/table/query', {
       method: 'POST',
       body: JSON.stringify({
-        token
+        token,
+        sql
       })
     }).then((res) => res.json());
 
-    console.log("ready:", res);
-
     if (!res.ready) {
-      return new Promise(resolve => setTimeout(resolve, 1000)).then(() => poll(token));
+      return new Promise(resolve => setTimeout(resolve, 1000)).then(() => poll(sql, token));
+    }
+
+    if (res.error != null) {
+      setLoading(false);
+      setError(res.error);
+      return;
     }
 
     if (res.selected != null) {
       setColumns(res.selected.columns);
       setValues(res.selected.values);
     }
+
+    setProof(res.proof);
+    setPublicSignals(res.publicSignals);
     setLoading(false);
   }
 
+  function exportProof() {
+    const files: [any, string][] = [[proof, "proof.json"], [publicSignals, "publicSignals.json"]];
+    for (const [data, fileName] of files) {
+      const jsonString = `data:text/json;chatset=utf-8,${encodeURIComponent(
+        JSON.stringify(data)
+      )}`;
+      const link = document.createElement("a");
+      link.href = jsonString;
+      link.download = fileName;
+      link.click();
+    }
+  }
+
   if (isLoading) return <p>Loading...</p>
+  if (error != null) return <p>Error: {error}</p>
 
   return (
     <Box>
-      <CardWrapper mb={4}>
-      <Table {...getTableProps()}>
-        <Thead>
-          {headerGroups.map((headerGroup, key) => (
-            <Tr {...headerGroup.getHeaderGroupProps()} key={key}>
-              {headerGroup.headers.map((column, key) => (
-                <Th {...column.getHeaderProps(column.getHeaderProps())} key={key}>
-                  {column.render('Header')}
-                </Th>
-              ))}
-            </Tr>
-          ))}
-        </Thead>
-        <Tbody {...getTableBodyProps()}>
-          {rows.map((row, key) => {
-            prepareRow(row)
-            return (
-              <Tr {...row.getRowProps()} key={key}>
-                {row.cells.map((cell, key) => (
-                  <Td {...cell.getCellProps()} key={key}>
-                    {cell.render('Cell')}
-                  </Td>
+      <FlexCardWrapper mb={4}>
+        <Table {...getTableProps()}>
+          <Thead>
+            {headerGroups.map((headerGroup, key) => (
+              <Tr {...headerGroup.getHeaderGroupProps()} key={key}>
+                {headerGroup.headers.map((column, key) => (
+                  <Th {...column.getHeaderProps(column.getHeaderProps())} key={key}>
+                    {column.render('Header')}
+                  </Th>
                 ))}
               </Tr>
-            )
-          })}
-        </Tbody>
-      </Table>
-      </CardWrapper>
+            ))}
+          </Thead>
+          <Tbody {...getTableBodyProps()}>
+            {rows.map((row, key) => {
+              prepareRow(row)
+              return (
+                <Tr {...row.getRowProps()} key={key}>
+                  {row.cells.map((cell, key) => (
+                    <Td {...cell.getCellProps()} key={key}>
+                      {cell.render('Cell')}
+                    </Td>
+                  ))}
+                </Tr>
+              )
+            })}
+          </Tbody>
+        </Table>
+        <Box h='20px'/>
+        {proof != null
+          ? (<Button leftIcon={<CheckIcon/>} colorScheme='green' onClick={exportProof}>Download proof</Button>)
+          : null
+        }
+      </FlexCardWrapper>
       <Box h='10px'/>
       <form onSubmit={handleSubmit(makeQuery)}>
         <Flex>
           <FormControl>
-            <Input
+            <Input variant='filled' backgroundColor='dappTemplate.dark.darker' h='45px'
               id='sql'
-              placeholder={`SELECT * FROM ${tableName}`}
+              placeholder={`SELECT *
+                              FROM ${tableName}`}
               {...register('sql', {
                 required: 'This is required',
               })}
@@ -137,7 +183,7 @@ export const TableView : FC<LoginModalButtonProps> = ({tableName}) => {
               {errors.name && errors.name.message}
             </FormErrorMessage>
           </FormControl>
-          <Box w='20px'/>
+          <Box w='20px' h='45px'/>
           <Button colorScheme='teal' isLoading={isSubmitting} type='submit'>
             Submit
           </Button>

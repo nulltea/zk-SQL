@@ -14,11 +14,10 @@ import {
   Flex, FormControl, Input, FormErrorMessage, Box, Button,
 } from '@chakra-ui/react'
 import {CardWrapper} from "./CardWrapper";
-import {ActionButton} from "../tools/ActionButton";
 import {Contract, ethers} from "ethers";
-const buildPoseidon = require("circomlibjs").buildPoseidon;
-import ZkSQL from "../../../server/artifacts/contracts/zkSQL.sol/ZkSQL.json";
+import ZkSQL from "zk-sql/artifacts/contracts/zkSQL.sol/ZkSQL.json";
 import {ZkSQL as IZkSQL} from "../../../server/typechain-types";
+import {commitToTable} from "zk-sql/src/client/client";
 
 
 const CustomModalOverlay = () => {
@@ -50,15 +49,14 @@ export function TablesSelector() {
     formState: { errors, isSubmitting },
   } = useForm()
 
-  async function createTable(values: { name: string }) {
+  async function createTable(values: { name: string, columns: string }) {
     setModalLoading(true);
-    const columns = ['f1', 'f2', 'f3'];
-    let poseidon = await buildPoseidon();
-    let commit = poseidon.F.toObject(poseidon([6]));
-    const contract = new Contract(process.env.ZK_SQL_CONTRACT!, ZkSQL.abi);
+    let columns = values.columns.split(',').map((c) => c.trim());
+    const contract = new Contract(process.env.NEXT_PUBLIC_ZK_SQL_CONTRACT!, ZkSQL.abi);
     const provider = new ethers.providers.Web3Provider(window.ethereum);
     const contractOwner = contract.connect(provider.getSigner()) as IZkSQL;
-    await contractOwner.createTable(values.name, BigInt(commit));
+    const commit = await commitToTable(columns)
+    await contractOwner.createTable(values.name, commit);
     fetch('/api/table/create', {
       method: 'POST',
       body: JSON.stringify({
@@ -82,8 +80,8 @@ export function TablesSelector() {
       <Grid templateColumns='repeat(5, 1fr)' gap={6}>
         {
           tables.map((table) => {
-            return <GridItem w='100%' h='10' key={table}>
-              <CardWrapper mb={4} cursor='pointer'>
+            return <GridItem w='100%' key={table}>
+              <CardWrapper h='100px' cursor='pointer'>
                 <Link href={`table?name=${table}`}>
                   {table}
                 </Link>
@@ -91,9 +89,9 @@ export function TablesSelector() {
             </GridItem>
           })
         }
-        <GridItem w='100%' h='10'>
-          <CardWrapper mb={4}>
-            <ActionButton onClick={open}>+</ActionButton>
+        <GridItem w='100%'>
+          <CardWrapper h='100px'>
+            <Button onClick={open} variant='ghost'>+</Button>
           </CardWrapper>
         </GridItem>
       </Grid>
@@ -132,7 +130,7 @@ export function TablesSelector() {
                 <FormControl>
                   <Input
                     id='name'
-                    placeholder='table2'
+                    placeholder='employees'
                     {...register('name', {
                       required: 'This is required',
                     })}
@@ -141,10 +139,23 @@ export function TablesSelector() {
                     {errors.name && errors.name.message}
                   </FormErrorMessage>
                 </FormControl>
-                <Box w='20px'/>
-                <Button colorScheme='teal' isLoading={isSubmitting} type='submit'>
-                  Submit
-                </Button>
+              <Box h='10px'/>
+              <FormControl>
+                <Input
+                  id='columns'
+                  placeholder='FirstName, LastName, Salary'
+                  {...register('columns', {
+                    required: 'This is required',
+                  })}
+                />
+                <FormErrorMessage>
+                  {errors.columns && errors.columns.message}
+                </FormErrorMessage>
+              </FormControl>
+              <Box h='10px'/>
+              <Button colorScheme='teal' isLoading={isSubmitting} type='submit'>
+                Submit
+              </Button>
             </form>
           </ModalBody>
         </ModalContent>

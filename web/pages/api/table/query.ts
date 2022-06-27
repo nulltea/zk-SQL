@@ -1,18 +1,25 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import {ClientConfig, getSqlRequest} from "../../../../server/src/client/client";
+import {ClientConfig, getSqlRequest} from "zk-sql/src/client/client";
 import {clientConfig} from "../config";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const {token} = JSON.parse(req.body);
+  const {sql, token} = JSON.parse(req.body);
   try {
-    const {ready, selected, changeCommit, proof} = await getSqlRequest(BigInt(token), clientConfig);
-
-    console.log(ready, selected, changeCommit, proof);
+    const {ready, selected, changeCommit, proof, error, publicSignals} = await getSqlRequest(sql, token, clientConfig);
 
     if (!ready) {
       res.json({
         ready: false,
       });
+
+      return;
+    }
+
+    if (error != null) {
+      res.json({
+        ready: true,
+        error: error.split('\n')[0]
+      })
 
       return;
     }
@@ -38,19 +45,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           columns,
           values,
         },
+        changeCommit,
         proof,
+        publicSignals: formatPublicSignals(publicSignals),
       });
     } else {
       res.json({
         ready: true,
         changeCommit,
         proof,
+        publicSignals: formatPublicSignals(publicSignals),
       });
     }
   } catch (error: any) {
-    console.log(error);
+    console.log("query error:", error);
     const { message } = JSON.parse(error.body).error
     const reason = message.substring(message.indexOf("'") + 1, message.lastIndexOf("'"))
     res.status(500).send(reason || "Unknown error!")
   }
+}
+
+function formatPublicSignals(sigs: bigint[]): number[] {
+  return sigs.map((s) => Number(s))
 }

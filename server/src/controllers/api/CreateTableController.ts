@@ -22,10 +22,6 @@ export type CreateTableRequest = {
     table: Table,
 }
 
-const circuitParams: CircuitParams = {
-    maxAND: 5, maxOR: 2, maxRows: 10,
-}
-
 
 @Controller("/create")
 export class CreateTableController {
@@ -39,6 +35,7 @@ export class CreateTableController {
         });
 
         createTable(payload.table);
+        writeDB();
 
         return {
             ok: true

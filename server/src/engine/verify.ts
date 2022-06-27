@@ -7,7 +7,6 @@ const {plonk} = require("snarkjs");
 
 export function verifyProof(type: string, publicInputs: bigint[], proof: Uint8Array, path?: string): Promise<any> {
     const vKey = JSON.parse(fs.readFileSync(`${path ?? "circuits/build"}/${type}/verification_key.json`).toString());
-    console.log(vKey, publicInputs, proof);
     return plonk.verify(vKey, publicInputs, proof);
 }
 

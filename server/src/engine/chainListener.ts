@@ -53,17 +53,23 @@ export function getSqlOpcode(type: string): number {
 export async function requestAllTables(provider: Provider): Promise<Map<string, bigint>> {
     let tablesMap = new Map<string, bigint>();
     const contract = new Contract(process.env.ZK_SQL_CONTRACT!, ZkSQL.abi);
-    let filter = contract.filters.TableUpdated();
-    let eventIFace = new utils.Interface(["event TableUpdated(string table, uint256 commitment)"]);
+    let filter = contract.filters.TableCreated();
+    let eventIFace = new utils.Interface(["event TableCreated(string table, uint256 commitment)"]);
     let tables = await provider.getLogs({
         address: filter.address,
-        fromBlock: await provider.getBlockNumber().then((b) => b - 10000),
+        fromBlock: Number(process.env.DEPLOYMENT_BLOCK!),
         toBlock: "latest",
         topics: filter.topics
-    }).then((logs) => logs.forEach((log) => {
+    }).then((logs) => logs.map((log) => {
         let args = eventIFace.parseLog(log).args;
-        tablesMap.set(args.table, args.commitment.toBigInt());
+        return args.table;
     }));
+
+    tables = tables.concat(["table1"]);
+    for (let table of tables) {
+        const commitNumber = await zkSqlContract.tableCommitments(table);
+        tablesMap.set(table, commitNumber.toBigInt());
+    }
 
     return tablesMap;
 }
