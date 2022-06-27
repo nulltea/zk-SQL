@@ -4,3 +4,5 @@
 
 export * from "./CreateTableController";
 export * from "./QueryController";
+export * from "./RequestController";
+export * from "./config";

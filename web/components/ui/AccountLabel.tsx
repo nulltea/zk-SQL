@@ -1,7 +1,5 @@
 import { Box, BoxProps } from '@chakra-ui/react';
 import { FC, useCallback } from 'react';
-import {LocalAccountInstance} from "../../types/account";
-
 interface AccountLabelProps extends BoxProps {
   disabled?: boolean;
 }

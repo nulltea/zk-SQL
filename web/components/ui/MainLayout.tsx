@@ -18,7 +18,7 @@ export const MainLayout: FC<MetaHeadProps> = memo(
             <Box>{children}</Box>
           </Container>
         </Box>
-        <Footer />
+        {/*<Footer />*/}
       </>
     );
   },

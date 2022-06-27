@@ -9,15 +9,16 @@ typechain
 
 #Hardhat files
 cache
-artifacts
+# artifacts
 *.zkey
 *.r1cs
 *.ptau
 *.sym
-verification_key.json
+# verification_key.json
 verifier.sol
 
-**/circuits/build
-**/typechain-types
+# **/circuits/build/**/*.wasm
+**/circuits/build/**/*.js
+# **/typechain-types
 
 server/dist

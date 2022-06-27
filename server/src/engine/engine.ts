@@ -3,6 +3,7 @@ import {AST, Parser} from "node-sql-parser/build/mysql";
 import {Database, SqlValue} from "sql.js";
 import {ethers} from "ethers";
 import {tableCommitments} from "./chainListener";
+import {commitToTable} from "../client/client";
 const {plonk} = require("snarkjs");
 const buildPoseidon = require("circomlibjs").buildPoseidon;
 
@@ -72,9 +73,14 @@ export async function execQuery(db: Database, query: string, argsCommit: bigint,
     }
 
     const {headerMap, tableValues} = getTable(db, tableName, args);
-    const tableColumns = Array.from(headerMap.values());
+    const tableColumns = Array.from(headerMap.keys());
+    const tableColumnsCodes = Array.from(headerMap.values());
+
+    [...Array(args.maxCols-tableColumnsCodes.length)].map(_ => tableColumnsCodes.push(0));
 
     const tableCommit = tableCommitments.get(tableName)!;
+
+    console.log(tableCommit, await commitToTable(tableColumns));
 
     switch (ast.type) {
         case "select": {
@@ -82,7 +88,10 @@ export async function execQuery(db: Database, query: string, argsCommit: bigint,
             if (Array.isArray(ast.columns)) {
                 ast.columns.unshift({expr: {type: "column_ref", table: null, column: "id"}, as: 'id'});
             }
-            const selected = db.exec(parser.sqlify(ast))[0];
+            const selected = db.exec(parser.sqlify(ast))[0] ?? {
+                columns: ["id"].concat(tableColumns),
+                values: []
+            }
             selected.columns.shift();
             let formattedView = formatSqlValues(selected.values);
             const results = formatForCircuit(selected.columns, formattedView, headerMap, args);
@@ -94,7 +103,7 @@ export async function execQuery(db: Database, query: string, argsCommit: bigint,
                     values: formattedView,
                 },
                 inputs: {
-                    header: tableColumns,
+                    header: tableColumnsCodes,
                     table: tableValues,
                     tableCommit,
                     fields: parsed.fields,
@@ -104,6 +113,7 @@ export async function execQuery(db: Database, query: string, argsCommit: bigint,
             };
 
             if (prove) {
+                console.log(result.inputs);
                 const {proof, solidityProof, newTableCommit} = await unpackProof(plonk.fullProve(
                     result.inputs,
                     "circuits/build/select/select_js/select.wasm",
@@ -116,6 +126,7 @@ export async function execQuery(db: Database, query: string, argsCommit: bigint,
             }
 
 
+
             return result;
         }
         case "insert": {
@@ -124,7 +135,7 @@ export async function execQuery(db: Database, query: string, argsCommit: bigint,
             const result: ExecResult = {
                 tableName,
                 inputs: {
-                    header: tableColumns,
+                    header: tableColumnsCodes,
                     table: tableValues,
                     tableCommit,
                     insertValues: parsed.insertValues,
@@ -147,7 +158,10 @@ export async function execQuery(db: Database, query: string, argsCommit: bigint,
             if (ast.columns === null) {
                 ast.columns = Array.from(headerMap.keys());
             }
+
             db.run(parser.sqlify(ast));
+
+            result.selected = selectTable(db, tableName);
 
             return result;
         }
@@ -157,7 +171,7 @@ export async function execQuery(db: Database, query: string, argsCommit: bigint,
             const result: ExecResult = {
                 tableName,
                 inputs: {
-                    header: tableColumns,
+                    header: tableColumnsCodes,
                     table: tableValues,
                     tableCommit,
                     whereConditions: parsed.whereConditions,
@@ -180,6 +194,8 @@ export async function execQuery(db: Database, query: string, argsCommit: bigint,
 
             db.run(query);
 
+            result.selected = selectTable(db, tableName);
+
             return result;
         }
         case "delete": {
@@ -188,7 +204,7 @@ export async function execQuery(db: Database, query: string, argsCommit: bigint,
             const result: ExecResult = {
                 tableName,
                 inputs: {
-                    header: tableColumns,
+                    header: tableColumnsCodes,
                     table: tableValues,
                     tableCommit,
                     whereConditions: parsed.whereConditions,
@@ -209,6 +225,8 @@ export async function execQuery(db: Database, query: string, argsCommit: bigint,
             }
 
             db.run(query);
+
+            result.selected = selectTable(db, tableName);
 
             return result;
         }
@@ -254,7 +272,7 @@ export async function genArgsCommitment(ast: AST, header: Map<string, number>, a
 
     switch (ast.type) {
         case "select":
-            return 0n;
+            return BigInt(0);
         case "insert":
             const insertParsed = parseInsert(ast, args);
             return poseidon.F.toObject(poseidon(insertParsed.insertValues));
@@ -274,15 +292,31 @@ export async function genArgsCommitment(ast: AST, header: Map<string, number>, a
     throw Error("unsupported query");
 }
 
+function selectTable(db: Database, tableName: string): {
+    columns: string[],
+    values: SqlRow[]
+} {
+    const selected = db.exec(`SELECT * FROM ${tableName}`)[0];
+    selected.columns.shift();
+    let formattedView = formatSqlValues(selected.values);
+
+    return  {
+        columns: selected.columns,
+        values: formattedView,
+    }
+}
+
 function getTable(db: Database, tableName: string, args: CircuitParams): {
     tableValues: bigint[][],
     headerMap: Map<string, number>
 } {
+    const columns = db.exec(`PRAGMA table_info(${tableName})`)[0].values.map((cref) => cref[1] as string);
+    columns.shift();
     const tableState = db.exec(`SELECT * FROM ${tableName}`)[0];
-    tableState.columns.shift();
-    const headerMap = new Map<string, number>(tableState.columns.map((c) => [c, tableState.columns.indexOf(c)+1]));
+    const headerMap = new Map<string, number>(columns.map((c) => [c, columns.indexOf(c)+1]));
+    const tableValues = formatForCircuit(columns, formatSqlValues(tableState?.values ?? []), headerMap, args);
     return {
-        tableValues: formatForCircuit(tableState.columns, formatSqlValues(tableState.values), headerMap, args),
+        tableValues,
         headerMap
     }
 }
@@ -312,7 +346,7 @@ export function parseTableName(ast: AST): string {
 
 export function formatForCircuit(columns: string[], values: SqlRow[], header: Map<string, number>, args: CircuitParams): bigint[][] {
     let formatted = [];
-    const emptyRow = [...Array(header.size)].map(_ => 0n);
+    const emptyRow = [...Array(args.maxCols)].map(_ => 0n);
     const columnMap = Array.from(header.keys())
         .map((column) => columns.indexOf(column));
 
@@ -320,7 +354,7 @@ export function formatForCircuit(columns: string[], values: SqlRow[], header: Ma
         let row = values.find((row) => row.idx == i + 1);
         if (row !== undefined) {
             let fRow = [];
-            for (let j = 0; j < header.size; j++) {
+            for (let j = 0; j < args.maxCols; j++) {
                 fRow.push(columnMap[j] > -1 ? encodeSqlValue(row.values[columnMap[j]]) : 0n);
             }
             formatted.push(fRow);

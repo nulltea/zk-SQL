@@ -11,7 +11,7 @@ import "@tsed/ajv";
 import "@tsed/swagger";
 import {config} from "./config";
 import * as rest from "./controllers/api";
-import {initDB} from "./engine/database";
+import {createTable, initDB, writeDB} from "./engine/database";
 import {listenToChain} from "./engine/chainListener";
 import {ethers} from "hardhat";
 import {PlonkVerifier as InsertVerifier} from "../typechain-types/insertVerifier.sol";

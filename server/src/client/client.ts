@@ -5,7 +5,7 @@ import {CircuitParams} from "../engine/parser";
 import {commitToQuery} from "../engine/engine";
 import {SqlResponse} from "../controllers/api";
 import {genPublicSignals, verifyProof} from "../engine/verify";
-
+const buildPoseidon = require("circomlibjs").buildPoseidon;
 
 export type ClientConfig = {
     serverAddress: string
@@ -14,23 +14,19 @@ export type ClientConfig = {
     circuitsPath?: string
 }
 
-export async function makeSqlRequest(sql: string, cfg: ClientConfig): Promise<SqlResponse> {
-    const provider = new providers.JsonRpcProvider(process.env.CHAIN_RPC)
-    const contract = new Contract(process.env.ZK_SQL_CONTRACT!, ZkSQL.abi)
-    const contractOwner = contract.connect(provider) as IZkSQL;
-    const {commit, table, type} = await commitToQuery(sql, cfg.knownTables, cfg.circuitParams);
-    const tableCommit = (await contractOwner.tableCommitments(table)).toBigInt();
-    // if (type != "select") {
-    //     await contractOwner.request(table, commit);
-    // }
+export type SqlQueryResult = SqlResponse & {
+    publicSignals?: bigint[]
+}
 
-    const tableColumns = cfg.knownTables.get(table);
-    if (tableColumns === undefined) {
-        throw Error("unknown table");
-    }
-    const tableHeader = new Map<string, number>(tableColumns.map((c) => [c, tableColumns.indexOf(c)+1]));
+export type SqlRequestResponse = {
+    error?: string,
+    token?: string,
+}
 
-    const res = await fetch(`${cfg.serverAddress}/api/query`, {
+export async function postSqlRequest(sql: string, cfg: ClientConfig): Promise<SqlRequestResponse> {
+    const {commit} = await commitToQuery(sql, cfg.knownTables, cfg.circuitParams);
+
+    const res = await fetch(`${cfg.serverAddress}/api/request`, {
         method: "POST",
         headers: {
             'Content-Type': 'application/json'
@@ -42,27 +38,79 @@ export async function makeSqlRequest(sql: string, cfg: ClientConfig): Promise<Sq
     });
 
     if (!res.ok) {
-        throw Error(res.statusText);
+        return {
+            error: res.statusText
+        }
+    }
+
+    return res.json();
+}
+
+
+export async function getSqlRequest(sql: string, token: string, cfg: ClientConfig): Promise<SqlQueryResult> {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), 2000);
+
+    let res;
+    try {
+        res = await fetch(`${cfg.serverAddress}/api/query/${token}`, {
+            signal: controller.signal
+        });
+    } catch (e) {
+        return {
+            ready: false,
+        }
+    }
+
+
+    clearTimeout(id);
+
+    if (!res.ok) {
+        return {
+            ready: true,
+            error: res.statusText
+        }
     }
 
     let respBody: SqlResponse = await res.json();
 
-    if (respBody.error != null) {
-        throw Error(respBody.error);
+    if (!respBody.ready) {
+        return {
+            ready: false,
+        }
     }
 
-    let publicSignals = genPublicSignals(
+    const {commit, table, type} = await commitToQuery(sql, cfg.knownTables, cfg.circuitParams);
+
+    const tableColumns = cfg.knownTables.get(table);
+    if (tableColumns === undefined) {
+        throw Error("unknown table");
+    }
+
+    const provider = new providers.JsonRpcProvider(process.env.CHAIN_RPC)
+    const contract = new Contract(process.env.ZK_SQL_CONTRACT!, ZkSQL.abi)
+    const contractOwner = contract.connect(provider) as IZkSQL;
+
+    const tableHeader = new Map<string, number>(tableColumns.map((c) => [c, tableColumns.indexOf(c)+1]));
+    const tableCommit = (await contractOwner.tableCommitments(table)).toBigInt();
+
+    let result: SqlQueryResult = respBody;
+    result.publicSignals = genPublicSignals(
         sql,
         commit,
         tableHeader,
         cfg.circuitParams,
         tableCommit,
-        respBody.selected != null ? respBody.selected.values : respBody.changeCommit
+        type == "select" ? respBody.selected!.values : respBody.changeCommit
     );
 
-    if (!await verifyProof(type, publicSignals, respBody.proof, cfg.circuitsPath)) {
-        throw Error("invalid proof");
-    }
+    return result;
+}
 
-    return respBody;
+
+export async function commitToTable(columns: string[]): Promise<bigint> {
+    let columnCodes = columns.map((c) => BigInt(columns.indexOf(c)+1))
+    let poseidon = await buildPoseidon();
+    let preimage = columnCodes.reduce((sum, x) => sum + x, 0n);
+    return poseidon.F.toObject(poseidon([preimage]));
 }

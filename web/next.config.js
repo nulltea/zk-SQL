@@ -12,7 +12,7 @@ const nextConfig = {
       events: require.resolve('process/browser'),
       assert: require.resolve("assert/"),
       // util: require.resolve("util/"),
-      // constants: require.resolve("constants/"),
+      constants: require.resolve("constants/"),
       os: require.resolve("os/")
     };
     return config;

@@ -1,9 +1,9 @@
-import {AST, Parser} from 'node-sql-parser/build/mysql'
-import exp = require("constants");
+import {AST, Parser} from 'node-sql-parser/build/mysql';
 
 export type CircuitParams = {
     maxOR: number,
     maxAND: number,
+    maxCols: number,
     maxRows: number,
 }
 
@@ -85,10 +85,10 @@ export function parseSelect(ast: AST, header: Map<string, number>, args: Circuit
     let columns: string[] = [];
     if ("columns" in ast) {
         if (ast.columns === '*') {
-            fields = [...Array(header.size)].map(_ => 1n);
+            fields = [...Array(args.maxCols)].map(_ => 1n);
             columns = Array.from(header.keys());
         } else {
-            fields = [...Array(header.size)].map(_ => 0n)
+            fields = [...Array(args.maxCols)].map(_ => 0n)
             ast.columns!.forEach((cRef) => {
                 let columnIdx = header.get(cRef.expr.column);
                 if (columnIdx === undefined) {
