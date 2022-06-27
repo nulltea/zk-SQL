@@ -50,3 +50,6 @@ To run dev server:
 ```bash
 npm start
 ```
+
+## Limitations
+- Currently zk-SQL supports ONLY NUMBERS as sql values
