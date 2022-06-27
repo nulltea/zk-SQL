@@ -12,9 +12,7 @@ const dbCacheFile = './cache/database.sqlite'
 export let db: Database;
 
 export async function initDB(fromCache: boolean, ...orTables: Table[]) {
-    let SQL = await initSqlJs({
-        locateFile: file => `https://sql.js.org/dist/${file}`
-    });
+    let SQL = await initSqlJs();
 
     if (fromCache && fs.existsSync(dbCacheFile)) {
         const buffer = fs.readFileSync(dbCacheFile);

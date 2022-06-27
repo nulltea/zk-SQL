@@ -17,8 +17,8 @@ cache
 # verification_key.json
 verifier.sol
 
-**/circuits/build/**/*.wasm
+# **/circuits/build/**/*.wasm
 **/circuits/build/**/*.js
-## **/typechain-types
+# **/typechain-types
 
 server/dist
