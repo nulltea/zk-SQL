@@ -1,7 +1,7 @@
 import {Controller} from "@tsed/di";
 import {Get, Post} from "@tsed/schema";
 import {BodyParams} from "@tsed/platform-params";
-import {createTable, db, Table, writeDB} from "../../engine/database";
+import {createTable, db, knownTables, Table, writeDB} from "../../engine/database";
 import {CircuitParams} from "../../engine/parser";
 import {
     getSqlOpcode,

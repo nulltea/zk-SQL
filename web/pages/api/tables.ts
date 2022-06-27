@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import {Contract, providers, utils, Wallet} from "ethers";
+import {Contract, providers, utils} from "ethers";
 import {Provider} from "@ethersproject/abstract-provider";
 import ZkSQL from "../../../server/artifacts/contracts/zkSQL.sol/ZkSQL.json";
 

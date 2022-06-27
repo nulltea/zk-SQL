@@ -10,6 +10,7 @@ export type Table = {
 const dbCacheFile = './cache/database.sqlite'
 
 export let db: Database;
+export let knownTables = new Map<string, string[]>();
 
 export async function initDB(fromCache: boolean, ...orTables: Table[]) {
     let SQL = await initSqlJs();
@@ -40,4 +41,14 @@ export function createTable(table: Table) {
     table.values?.forEach((row) => {
         db.run(`INSERT INTO table1 (${table.columns.join(',')}) VALUES (${row.join(", ")})`);
     });
+
+    knownTables.set(table.name, table.columns);
+}
+
+export function discoverTables(db: Database, tableNames: string[]) {
+    for (let tableName of tableNames) {
+        const columns = db.exec(`PRAGMA table_info(${tableName})`)[0].values.map((cref) => cref[1] as string);
+        columns.shift();
+        knownTables.set(tableName, columns);
+    }
 }

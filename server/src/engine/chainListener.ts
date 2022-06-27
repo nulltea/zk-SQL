@@ -2,12 +2,13 @@ import {BigNumber, Contract, providers, utils, Wallet} from "ethers";
 import ZkSQL from "../../artifacts/contracts/zkSQL.sol/ZkSQL.json";
 import {ZkSQL as IZkSQL} from "../../typechain-types";
 import {Provider} from "@ethersproject/providers";
+import {db, discoverTables, knownTables} from "./database";
 
 export let provider: any;
 export let zkSqlContract: IZkSQL;
 export const pendingRequests = new Map<bigint, string>();
 export const pendingTablesToCreate = new Map<bigint, string>();
-export let tableCommitments = new Map<string, bigint>()
+export let tableCommitments = new Map<string, bigint>();
 
 export async function listenToChain(address: string) {
     provider = new providers.JsonRpcProvider(process.env.CHAIN_RPC);
@@ -17,7 +18,10 @@ export async function listenToChain(address: string) {
     zkSqlContract = contract.connect(wallet) as IZkSQL;
 
     tableCommitments = await requestAllTables(provider);
-    console.log(tableCommitments);
+    discoverTables(db, Array.from(tableCommitments.keys()));
+
+    console.log("tableCommitments:", tableCommitments);
+    console.log("knownTables:", knownTables);
 
     zkSqlContract.on("RequestPosted", (address: any, argsCommitment: BigNumber) => {
         pendingRequests.set(argsCommitment.toBigInt(), "");
