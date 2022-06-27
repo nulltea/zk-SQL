@@ -32,6 +32,7 @@ export const TableView: FC<TableViewProps> = () => {
   const [isLoading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [proof, setProof] = useState(null);
+  const [reqMade, setReqMade] = useState(0);
   const [publicSignals, setPublicSignals] = useState([]);
 
   const {getTableProps, getTableBodyProps, headerGroups, rows, prepareRow} =
@@ -96,7 +97,12 @@ export const TableView: FC<TableViewProps> = () => {
     }).then((res) => res.json());
 
     if (!res.ready) {
-      return new Promise(resolve => setTimeout(resolve, 1000)).then(() => poll(sql, token));
+      if (reqMade > 20) {
+        setLoading(false);
+        setError("request timed out");
+      }
+      setReqMade(reqMade + 1);
+      return new Promise(resolve => setTimeout(resolve, 2000)).then(() => poll(sql, token));
     }
 
     if (res.error != null) {

@@ -48,11 +48,22 @@ export async function postSqlRequest(sql: string, cfg: ClientConfig): Promise<Sq
 
 
 export async function getSqlRequest(sql: string, token: string, cfg: ClientConfig): Promise<SqlQueryResult> {
-    const provider = new providers.JsonRpcProvider(process.env.CHAIN_RPC)
-    const contract = new Contract(process.env.ZK_SQL_CONTRACT!, ZkSQL.abi)
-    const contractOwner = contract.connect(provider) as IZkSQL;
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), 2000);
 
-    const res = await fetch(`${cfg.serverAddress}/api/query/${token}`);
+    let res;
+    try {
+        res = await fetch(`${cfg.serverAddress}/api/query/${token}`, {
+            signal: controller.signal
+        });
+    } catch (e) {
+        return {
+            ready: false,
+        }
+    }
+
+
+    clearTimeout(id);
 
     if (!res.ok) {
         return {
@@ -75,6 +86,11 @@ export async function getSqlRequest(sql: string, token: string, cfg: ClientConfi
     if (tableColumns === undefined) {
         throw Error("unknown table");
     }
+
+    const provider = new providers.JsonRpcProvider(process.env.CHAIN_RPC)
+    const contract = new Contract(process.env.ZK_SQL_CONTRACT!, ZkSQL.abi)
+    const contractOwner = contract.connect(provider) as IZkSQL;
+
     const tableHeader = new Map<string, number>(tableColumns.map((c) => [c, tableColumns.indexOf(c)+1]));
     const tableCommit = (await contractOwner.tableCommitments(table)).toBigInt();
 
