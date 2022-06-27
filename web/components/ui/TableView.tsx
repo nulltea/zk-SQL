@@ -14,12 +14,13 @@ import {
 } from '@chakra-ui/react'
 import {CheckIcon} from "@chakra-ui/icons";
 import {useTable} from 'react-table';
-import {CardWrapper, FlexCardWrapper} from "./CardWrapper";
+import {FlexCardWrapper} from "./CardWrapper";
 import ZkSQL from "../../../server/artifacts/contracts/zkSQL.sol/ZkSQL.json";
 import {ZkSQL as IZkSQL} from "../../../server/typechain-types";
 import {Contract, ethers} from "ethers";
 import {useRouter} from "next/router";
 import {SqlQueryResult} from "zk-sql/src/client/client";
+import {verifyProof} from "../../utils/verify";
 
 interface TableViewProps {
 }
@@ -114,6 +115,13 @@ export const TableView: FC<TableViewProps> = () => {
     if (res.selected != null) {
       setColumns(res.selected.columns);
       setValues(res.selected.values);
+    }
+
+    const isVerified = await verifyProof("select", res.publicSignals, res.proof);
+
+    if (!isVerified) {
+      setLoading(false);
+      setError("proof verification failed!");
     }
 
     setProof(res.proof);

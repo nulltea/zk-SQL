@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import {getSqlRequest} from "zk-sql/src/client/client";
 import {getClientConfig} from "../config";
+import {verifyProof} from "../../../utils/verify";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const {sql, token} = JSON.parse(req.body);
@@ -66,6 +67,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 }
 
-function formatPublicSignals(sigs: bigint[]): number[] {
-  return sigs.map((s) => Number(s))
+function formatPublicSignals(sigs: bigint[]): string[] {
+  return sigs.map((s) => String(s))
 }
