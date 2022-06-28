@@ -1,13 +1,18 @@
-import initSqlJs, {Database} from "sql.js";
+import initSqlJs, {Database, SqlValue} from "sql.js";
 import * as fs from "fs";
 
 export type Table = {
     name: string,
-    columns: string[],
-    values: number[][]
+    columns: Column[],
+    values: SqlValue[][]
 }
 
-const dbCacheFile = process.env.DB_CACHE_PATH;
+export type Column = {
+    name: string,
+    type: string,
+}
+
+const dbCacheFile = process.env.DB_CACHE_PATH!;
 
 export let db: Database;
 export let knownTables = new Map<string, string[]>();
@@ -22,10 +27,7 @@ export async function initDB(fromCache: boolean, ...orTables: Table[]) {
         db = new SQL.Database();
 
         for (let table of orTables) {
-            db.run("CREATE TABLE table1 (id INTEGER PRIMARY KEY AUTOINCREMENT, f1 int, f2 int, f3 int, f4 int, f5 int)");
-            table.values.forEach((row) => {
-                db.run(`INSERT INTO table1 (${table.columns.join(',')}) VALUES (${row.join(", ")})`);
-            });
+            createTable(table);
         }
     }
 }
@@ -37,12 +39,12 @@ export function writeDB() {
 }
 
 export function createTable(table: Table) {
-    db.run(`CREATE TABLE ${table.name} (id INTEGER PRIMARY KEY AUTOINCREMENT, ${table.columns.map((c) => [c, "int"].join(' '))})`);
+    db.run(`CREATE TABLE ${table.name} (id INTEGER PRIMARY KEY AUTOINCREMENT, ${table.columns.map((c) => [c.name, c.type].join(' '))})`);
     table.values?.forEach((row) => {
-        db.run(`INSERT INTO table1 (${table.columns.join(',')}) VALUES (${row.join(", ")})`);
+        db.run(`INSERT INTO table1 (${table.columns.map(c => c.name).join(',')}) VALUES (${row.map(v => sqlValueToStatement(v)).join(", ")})`);
     });
 
-    knownTables.set(table.name, table.columns);
+    knownTables.set(table.name, table.columns.map(c => c.name));
 }
 
 export function discoverTables(db: Database, tableNames: string[]) {
@@ -50,5 +52,16 @@ export function discoverTables(db: Database, tableNames: string[]) {
         const columns = db.exec(`PRAGMA table_info(${tableName})`)[0].values.map((cref) => cref[1] as string);
         columns.shift();
         knownTables.set(tableName, columns);
+    }
+}
+
+function sqlValueToStatement(v: SqlValue): string {
+    switch (typeof v) {
+        case "number":
+            return v.toString();
+        case "string":
+            return `'${v}'`;
+        default:
+            return v?.toString() ?? "";
     }
 }

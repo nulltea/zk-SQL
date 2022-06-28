@@ -1,10 +1,12 @@
-import {AST, Parser} from 'node-sql-parser/build/mysql';
+import {AST} from 'node-sql-parser/build/mysql';
+import {encodeSqlValue} from "./encode";
 
 export type CircuitParams = {
     maxOR: number,
     maxAND: number,
     maxCols: number,
     maxRows: number,
+    artifactsPath?: string
 }
 
 type SelectQuery = {
@@ -55,12 +57,13 @@ class WhereCondition {
         }
     }
 
-    public serialize(nAND: number, nOR: number): bigint[][][] {
+    public serialize(nAND: number, nOR: number, header: Map<string, bigint>): bigint[][][] {
         let whereEncoded = [];
+        let columnCodes = Array.from(header.values());
         for (const andCond of this.conditions) {
             let inner = [];
             for (let i = 0; i < nAND; i++) {
-                let cond = andCond.conditions.find((c) => c.left == BigInt(i + 1));
+                let cond = andCond.conditions.find((c) => c.left == columnCodes[i]);
                 if (cond !== undefined) {
                     inner.push([cond.left, cond.right]);
                 } else {
@@ -80,7 +83,7 @@ class WhereCondition {
     }
 }
 
-export function parseSelect(ast: AST, header: Map<string, number>, args: CircuitParams): SelectQuery {
+export function parseSelect(ast: AST, header: Map<string, bigint>, args: CircuitParams): SelectQuery {
     let fields: bigint[] = [];
     let columns: string[] = [];
     if ("columns" in ast) {
@@ -88,14 +91,15 @@ export function parseSelect(ast: AST, header: Map<string, number>, args: Circuit
             fields = [...Array(args.maxCols)].map(_ => 1n);
             columns = Array.from(header.keys());
         } else {
-            fields = [...Array(args.maxCols)].map(_ => 0n)
+            fields = [...Array(args.maxCols)].map(_ => 0n);
+            const colNames = Array.from(header.keys());
             ast.columns!.forEach((cRef) => {
-                let columnIdx = header.get(cRef.expr.column);
-                if (columnIdx === undefined) {
+                const columnIdx = colNames.indexOf(cRef.expr.column)
+                if (columnIdx === -1) {
                     throw Error("unknown column");
                 }
 
-                fields[columnIdx - 1] = 1n;
+                fields[columnIdx] = 1n;
                 columns.push(cRef.expr.column);
             });
         }
@@ -111,21 +115,21 @@ export function parseSelect(ast: AST, header: Map<string, number>, args: Circuit
     return {
         columns,
         fields,
-        whereConditions: where.serialize(args.maxAND, args.maxOR)
+        whereConditions: where.serialize(args.maxAND, args.maxOR, header)
     }
 }
 
 export function parseInsert(ast: AST, args: CircuitParams): InsertQuery {
     if ("values" in ast && ast.values !== null && Array.isArray(ast.values)) {
         return {
-            insertValues: ast.values[0].value.map((e) => "value" in e && typeof e.value === "number" ? e.value: 0)
+            insertValues: ast.values[0].value.map((e) => "value" in e ? encodeSqlValue(e.value) : 0n)
         }
     }
 
     throw Error("unsupported values expression");
 }
 
-export function parseUpdate(ast: AST, header: Map<string, number>, args: CircuitParams): UpdateQuery {
+export function parseUpdate(ast: AST, header: Map<string, bigint>, args: CircuitParams): UpdateQuery {
     let where = new WhereCondition();
     if ("where" in ast && ast.where !== null) {
         where = parseWhere(ast.where, header, args);
@@ -133,11 +137,11 @@ export function parseUpdate(ast: AST, header: Map<string, number>, args: Circuit
 
     let setExpressions = [];
     if ("set" in ast && ast.set !== null) {
-        for (let column of header.values()) {
-            let cond = ast.set.find((c) => header.get(c.column) == column);
+        for (let columnCode of header.values()) {
+            let cond = ast.set.find((c) => header.get(c.column) == columnCode);
             if (cond !== undefined) {
                 if ("value" in cond) {
-                    setExpressions.push([BigInt(column), BigInt(cond.value.value)]);
+                    setExpressions.push([BigInt(columnCode), encodeSqlValue(cond.value.value)]);
                 } else {
                     throw Error("unsupported set value");
                 }
@@ -149,22 +153,22 @@ export function parseUpdate(ast: AST, header: Map<string, number>, args: Circuit
 
     return {
         setExpressions: setExpressions,
-        whereConditions: where.serialize(args.maxAND, args.maxOR)
+        whereConditions: where.serialize(args.maxAND, args.maxOR, header)
     }
 }
 
-export function parseDelete(ast: AST, header: Map<string, number>, args: CircuitParams): DeleteQuery {
+export function parseDelete(ast: AST, header: Map<string, bigint>, args: CircuitParams): DeleteQuery {
     let where = new WhereCondition();
     if ("where" in ast && ast.where !== null) {
         where = parseWhere(ast.where, header, args);
     }
 
     return {
-        whereConditions: where.serialize(args.maxAND, args.maxOR)
+        whereConditions: where.serialize(args.maxAND, args.maxOR, header)
     }
 }
 
-function parseWhere(ast: any, header: Map<string, number>, args: CircuitParams): WhereCondition {
+function parseWhere(ast: any, header: Map<string, bigint>, args: CircuitParams): WhereCondition {
     let condition = parseCondition(ast, header, args);
 
     if (condition instanceof Condition) {
@@ -176,7 +180,7 @@ function parseWhere(ast: any, header: Map<string, number>, args: CircuitParams):
     return condition;
 }
 
-function parseCondition(ast: {operator: string, left: any, right: any}, header: Map<string, number>, args: CircuitParams): WhereCondition | ANDCondition | Condition {
+function parseCondition(ast: {operator: string, left: any, right: any}, header: Map<string, bigint>, args: CircuitParams): WhereCondition | ANDCondition | Condition {
     switch (ast.operator) {
         case 'OR': {
             let condition = new WhereCondition();
@@ -223,12 +227,12 @@ function parseCondition(ast: {operator: string, left: any, right: any}, header: 
             return condition;
         }
         case '=': {
-            let columnIdx = header.get(ast.left.column);
-            if (columnIdx === undefined) {
+            let columnCode = header.get(ast.left.column);
+            if (columnCode === undefined) {
                 throw Error("unknown column");
             }
 
-            return new Condition(BigInt(columnIdx), BigInt(ast.right.value));
+            return new Condition(BigInt(columnCode), encodeSqlValue(ast.right.value));
         }
     }
 

@@ -3,12 +3,13 @@ import {AST, Parser} from "node-sql-parser/build/mysql";
 import {Database, SqlValue} from "sql.js";
 import {ethers} from "ethers";
 import {tableCommitments} from "./chainListener";
-import {commitToTable} from "../client/client";
+import {encodeSqlValue} from "./encode";
+
 const {plonk} = require("snarkjs");
 const buildPoseidon = require("circomlibjs").buildPoseidon;
 
 type SelectCircuitInputs = {
-    header: number[],
+    header: bigint[],
     table: bigint[][],
     tableCommit: bigint,
     fields: bigint[],
@@ -17,7 +18,7 @@ type SelectCircuitInputs = {
 }
 
 type InsertCircuitInputs = {
-    header: number[],
+    header: bigint[],
     table: bigint[][],
     tableCommit: bigint,
     insertValues: bigint[],
@@ -25,7 +26,7 @@ type InsertCircuitInputs = {
 }
 
 type UpdateCircuitInputs = {
-    header: number[],
+    header: bigint[],
     table: bigint[][],
     tableCommit: bigint,
     whereConditions: bigint[][][],
@@ -34,7 +35,7 @@ type UpdateCircuitInputs = {
 }
 
 type DeleteCircuitInputs = {
-    header: number[],
+    header: bigint[],
     table: bigint[][],
     tableCommit: bigint,
     whereConditions: bigint[][][],
@@ -58,8 +59,7 @@ type ExecResult = {
     inputs: SelectCircuitInputs | InsertCircuitInputs | UpdateCircuitInputs | DeleteCircuitInputs
 }
 
-export async function execQuery(db: Database, query: string, argsCommit: bigint, args: CircuitParams, prove: boolean): Promise<ExecResult>
-{
+export async function execQuery(db: Database, query: string, argsCommit: bigint, args: CircuitParams, prove: boolean): Promise<ExecResult> {
     const parser = new Parser();
     let {ast} = parser.parse(query)
 
@@ -75,12 +75,9 @@ export async function execQuery(db: Database, query: string, argsCommit: bigint,
     const {headerMap, tableValues} = getTable(db, tableName, args);
     const tableColumns = Array.from(headerMap.keys());
     const tableColumnsCodes = Array.from(headerMap.values());
-
-    [...Array(args.maxCols-tableColumnsCodes.length)].map(_ => tableColumnsCodes.push(0));
+    [...Array(args.maxCols - headerMap.size)].map(_ => tableColumnsCodes.push(0n));
 
     const tableCommit = tableCommitments.get(tableName)!;
-
-    console.log(tableCommit, await commitToTable(tableColumns));
 
     switch (ast.type) {
         case "select": {
@@ -113,18 +110,16 @@ export async function execQuery(db: Database, query: string, argsCommit: bigint,
             };
 
             if (prove) {
-                console.log(result.inputs);
                 const {proof, solidityProof, newTableCommit} = await unpackProof(plonk.fullProve(
                     result.inputs,
-                    "../lib/circuits/select/select_js/select.wasm",
-                    "../lib/circuits/select/circuit_final.zkey"
+                    `${args.artifactsPath ?? "../lib/circuits"}/select/select_js/select.wasm`,
+                    `${args.artifactsPath ?? "../lib/circuits"}/select/circuit_final.zkey`
                 ));
 
                 result.proof = proof;
                 result.solidityProof = solidityProof;
                 result.publicInputs = [newTableCommit];
             }
-
 
 
             return result;
@@ -146,8 +141,8 @@ export async function execQuery(db: Database, query: string, argsCommit: bigint,
             if (prove) {
                 const {proof, solidityProof, newTableCommit} = await unpackProof(plonk.fullProve(
                     result.inputs,
-                    "../lib/circuits/insert/insert_js/insert.wasm",
-                    "../lib/circuits/insert/circuit_final.zkey"
+                    `${args.artifactsPath ?? "../lib/circuits"}/insert/insert_js/insert.wasm`,
+                    `${args.artifactsPath ?? "../lib/circuits"}/insert/circuit_final.zkey`
                 ));
 
                 result.proof = proof;
@@ -183,8 +178,8 @@ export async function execQuery(db: Database, query: string, argsCommit: bigint,
             if (prove) {
                 const {proof, solidityProof, newTableCommit} = await unpackProof(plonk.fullProve(
                     result.inputs,
-                    "../lib/circuits/update/update_js/update.wasm",
-                    "../lib/circuits/update/circuit_final.zkey"
+                    `${args.artifactsPath ?? "../lib/circuits"}/update/update_js/update.wasm`,
+                    `${args.artifactsPath ?? "../lib/circuits"}/update/circuit_final.zkey`
                 ));
 
                 result.proof = proof;
@@ -215,8 +210,8 @@ export async function execQuery(db: Database, query: string, argsCommit: bigint,
             if (prove) {
                 const {proof, solidityProof, newTableCommit} = await unpackProof(plonk.fullProve(
                     result.inputs,
-                    "../lib/circuits/delete/delete_js/delete.wasm",
-                    "../lib/circuits/delete/circuit_final.zkey"
+                    `${args.artifactsPath ?? "../lib/circuits"}/delete/delete_js/delete.wasm`,
+                    `${args.artifactsPath ?? "../lib/circuits"}/delete/circuit_final.zkey`
                 ));
 
                 result.proof = proof;
@@ -235,8 +230,7 @@ export async function execQuery(db: Database, query: string, argsCommit: bigint,
     throw Error("unsupported query");
 }
 
-export async function commitToQuery(query: string, knownTables: Map<string, string[]>, args: CircuitParams): Promise<{commit: bigint, table: string, type: string}>
-{
+export async function commitToQuery(query: string, knownTables: Map<string, string[]>, args: CircuitParams): Promise<{ commit: bigint, table: string, type: string }> {
     const parser = new Parser();
     let {ast} = parser.parse(query)
 
@@ -256,14 +250,13 @@ export async function commitToQuery(query: string, knownTables: Map<string, stri
         throw Error("unknown table");
     }
 
-    const header = new Map<string, number>(tableColumns.map((c) => [c, tableColumns.indexOf(c)+1]));
+    const header = new Map<string, bigint>(tableColumns.map((c) => [c, encodeSqlValue(c)]));
     const commit = await genArgsCommitment(ast, header, args);
 
     return {commit, table: tableName, type};
 }
 
-export async function genArgsCommitment(ast: AST, header: Map<string, number>, args: CircuitParams): Promise<bigint>
-{
+export async function genArgsCommitment(ast: AST, header: Map<string, bigint>, args: CircuitParams): Promise<bigint> {
     if (!("type" in ast)) {
         throw Error("bad query");
     }
@@ -273,15 +266,18 @@ export async function genArgsCommitment(ast: AST, header: Map<string, number>, a
     switch (ast.type) {
         case "select":
             return BigInt(0);
-        case "insert":
-            const insertParsed = parseInsert(ast, args);
-            return poseidon.F.toObject(poseidon(insertParsed.insertValues));
-        case "update":
-            const updParsed = parseUpdate(ast, header, args);
-            let flatExpressions = updParsed.setExpressions.flat();
-            flatExpressions = flatExpressions.concat(...updParsed.whereConditions.flat());
-            let updPreImage = flatExpressions.reduce((sum, x) => sum + x, 0n);
-            return poseidon.F.toObject(poseidon([updPreImage]));
+        case "insert": {
+            const parsed = parseInsert(ast, args);
+            const preImage = parsed.insertValues.reduce((sum, x) => sum + x, 0n);
+            return poseidon.F.toObject(poseidon([preImage]));
+        }
+        case "update": {
+            const parsed = parseUpdate(ast, header, args);
+            let flatExpressions = parsed.setExpressions.flat();
+            flatExpressions = flatExpressions.concat(...parsed.whereConditions.flat());
+            const preImage = flatExpressions.reduce((sum, x) => sum + x, 0n);
+            return poseidon.F.toObject(poseidon([preImage]));
+        }
         case "delete":
             const delParsed = parseDelete(ast, header, args);
             let delPreImage = delParsed.whereConditions.flat(2).reduce((sum, x) => sum + x, 0n);
@@ -296,11 +292,12 @@ function selectTable(db: Database, tableName: string): {
     columns: string[],
     values: SqlRow[]
 } {
-    const selected = db.exec(`SELECT * FROM ${tableName}`)[0];
+    const selected = db.exec(`SELECT *
+                                FROM ${tableName}`)[0];
     selected.columns.shift();
     let formattedView = formatSqlValues(selected.values);
 
-    return  {
+    return {
         columns: selected.columns,
         values: formattedView,
     }
@@ -308,12 +305,13 @@ function selectTable(db: Database, tableName: string): {
 
 function getTable(db: Database, tableName: string, args: CircuitParams): {
     tableValues: bigint[][],
-    headerMap: Map<string, number>
+    headerMap: Map<string, bigint>
 } {
     const columns = db.exec(`PRAGMA table_info(${tableName})`)[0].values.map((cref) => cref[1] as string);
     columns.shift();
-    const tableState = db.exec(`SELECT * FROM ${tableName}`)[0];
-    const headerMap = new Map<string, number>(columns.map((c) => [c, columns.indexOf(c)+1]));
+    const tableState = db.exec(`SELECT *
+                                  FROM ${tableName}`)[0];
+    const headerMap = new Map<string, bigint>(columns.map((c) => [c, encodeSqlValue(c)]));
     const tableValues = formatForCircuit(columns, formatSqlValues(tableState?.values ?? []), headerMap, args);
     return {
         tableValues,
@@ -329,7 +327,7 @@ export function typeOfQuery(query: string): string {
         throw Error("bad query");
     }
 
-   return ast.type;
+    return ast.type;
 }
 
 export function parseTableName(ast: AST): string {
@@ -344,7 +342,7 @@ export function parseTableName(ast: AST): string {
     throw Error("unsupported query");
 }
 
-export function formatForCircuit(columns: string[], values: SqlRow[], header: Map<string, number>, args: CircuitParams): bigint[][] {
+export function formatForCircuit(columns: string[], values: SqlRow[], header: Map<string, bigint>, args: CircuitParams): bigint[][] {
     let formatted = [];
     const emptyRow = [...Array(args.maxCols)].map(_ => 0n);
     const columnMap = Array.from(header.keys())
@@ -377,12 +375,8 @@ function formatSqlValues(values: SqlValue[][]): SqlRow[] {
     return formatted;
 }
 
-function encodeSqlValue(v: SqlValue): bigint {
-    return BigInt(v as number);
-}
-
-async function unpackProof(raw: Promise<any>): Promise<{proof: any, solidityProof: Uint8Array, newTableCommit: bigint}> {
-    let { proof, publicSignals } = await raw;
+async function unpackProof(raw: Promise<any>): Promise<{ proof: any, solidityProof: Uint8Array, newTableCommit: bigint }> {
+    let {proof, publicSignals} = await raw;
 
     const editedPublicSignals = unstringifyBigInts(publicSignals);
     const editedProof = unstringifyBigInts(proof);
@@ -396,17 +390,17 @@ async function unpackProof(raw: Promise<any>): Promise<{proof: any, solidityProo
 }
 
 function unstringifyBigInts(o: any): any {
-    if ((typeof(o) == "string") && (/^[0-9]+$/.test(o) ))  {
+    if ((typeof (o) == "string") && (/^[0-9]+$/.test(o))) {
         return BigInt(o);
-    } else if ((typeof(o) == "string") && (/^0x[0-9a-fA-F]+$/.test(o) ))  {
+    } else if ((typeof (o) == "string") && (/^0x[0-9a-fA-F]+$/.test(o))) {
         return BigInt(o);
     } else if (Array.isArray(o)) {
         return o.map(unstringifyBigInts);
     } else if (typeof o == "object") {
-        if (o===null) return null;
+        if (o === null) return null;
         let res: any = {};
         const keys = Object.keys(o);
-        keys.forEach( (k) => {
+        keys.forEach((k) => {
             res[k] = unstringifyBigInts(o[k]);
         });
         return res;

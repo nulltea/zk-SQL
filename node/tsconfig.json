@@ -34,7 +34,7 @@
     "node_modules",
     "./public",
     "dist",
-    "../lib/test"
+    "../test"
   ],
   "linterOptions": {
     "exclude": [

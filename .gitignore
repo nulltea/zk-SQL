@@ -10,6 +10,7 @@ typechain
 #Hardhat files
 cache
 # artifacts
+**/artifacts/build-info
 *.zkey
 *.r1cs
 *.ptau
@@ -22,3 +23,4 @@ verifier.sol
 **/typechain-types
 
 node/dist
+test/ScratchTest.ts
