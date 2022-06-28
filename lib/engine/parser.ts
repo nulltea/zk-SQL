@@ -28,13 +28,24 @@ type DeleteQuery = {
     whereConditions: bigint[][][]
 }
 
+enum ConditionType {
+    Eq,
+    Ne,
+    Lt,
+    Gt,
+    Lte,
+    Gte
+}
+
 class Condition {
     left: bigint;
     right: bigint;
+    opcode: bigint;
 
-    public constructor(left: bigint, right: bigint) {
+    public constructor(left: bigint, type: ConditionType, right: bigint) {
         this.left = left;
         this.right = right;
+        this.opcode = BigInt(type);
     }
 }
 
@@ -65,9 +76,9 @@ class WhereCondition {
             for (let i = 0; i < nAND; i++) {
                 let cond = andCond.conditions.find((c) => c.left == columnCodes[i]);
                 if (cond !== undefined) {
-                    inner.push([cond.left, cond.right]);
+                    inner.push([cond.left, cond.opcode, cond.right]);
                 } else {
-                    inner.push([0n,0n])
+                    inner.push([0n,0n,0n])
                 }
             }
             whereEncoded.push(inner);
@@ -75,7 +86,7 @@ class WhereCondition {
 
         const emptyOrs = nOR - whereEncoded.length;
         for (let i = 0; i < emptyOrs; i++) {
-            whereEncoded.push([...Array(nAND)].map(_ => [0n, 0n]));
+            whereEncoded.push([...Array(nAND)].map(_ => [0n,0n,0n]));
         }
 
 
@@ -232,7 +243,47 @@ function parseCondition(ast: {operator: string, left: any, right: any}, header: 
                 throw Error("unknown column");
             }
 
-            return new Condition(BigInt(columnCode), encodeSqlValue(ast.right.value));
+            return new Condition(BigInt(columnCode), ConditionType.Eq, encodeSqlValue(ast.right.value));
+        }
+        case '!=': {
+            let columnCode = header.get(ast.left.column);
+            if (columnCode === undefined) {
+                throw Error("unknown column");
+            }
+
+            return new Condition(BigInt(columnCode), ConditionType.Ne, encodeSqlValue(ast.right.value));
+        }
+        case '<': {
+            let columnCode = header.get(ast.left.column);
+            if (columnCode === undefined) {
+                throw Error("unknown column");
+            }
+
+            return new Condition(BigInt(columnCode), ConditionType.Lt, encodeSqlValue(ast.right.value));
+        }
+        case '>': {
+            let columnCode = header.get(ast.left.column);
+            if (columnCode === undefined) {
+                throw Error("unknown column");
+            }
+
+            return new Condition(BigInt(columnCode), ConditionType.Gt, encodeSqlValue(ast.right.value));
+        }
+        case '<=': {
+            let columnCode = header.get(ast.left.column);
+            if (columnCode === undefined) {
+                throw Error("unknown column");
+            }
+
+            return new Condition(BigInt(columnCode), ConditionType.Lte, encodeSqlValue(ast.right.value));
+        }
+        case '>=': {
+            let columnCode = header.get(ast.left.column);
+            if (columnCode === undefined) {
+                throw Error("unknown column");
+            }
+
+            return new Condition(BigInt(columnCode), ConditionType.Gte, encodeSqlValue(ast.right.value));
         }
     }
 

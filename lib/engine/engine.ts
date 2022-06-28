@@ -78,6 +78,7 @@ export async function execQuery(db: Database, query: string, argsCommit: bigint,
     [...Array(args.maxCols - headerMap.size)].map(_ => tableColumnsCodes.push(0n));
 
     const tableCommit = tableCommitments.get(tableName)!;
+    const circuitsPath = args.artifactsPath ?? "../lib/artifacts/circuits"
 
     switch (ast.type) {
         case "select": {
@@ -112,8 +113,8 @@ export async function execQuery(db: Database, query: string, argsCommit: bigint,
             if (prove) {
                 const {proof, solidityProof, newTableCommit} = await unpackProof(plonk.fullProve(
                     result.inputs,
-                    `${args.artifactsPath ?? "../lib/circuits"}/select/select_js/select.wasm`,
-                    `${args.artifactsPath ?? "../lib/circuits"}/select/circuit_final.zkey`
+                    `${circuitsPath}/select/select_js/select.wasm`,
+                    `${circuitsPath}/select/circuit_final.zkey`
                 ));
 
                 result.proof = proof;
@@ -141,8 +142,8 @@ export async function execQuery(db: Database, query: string, argsCommit: bigint,
             if (prove) {
                 const {proof, solidityProof, newTableCommit} = await unpackProof(plonk.fullProve(
                     result.inputs,
-                    `${args.artifactsPath ?? "../lib/circuits"}/insert/insert_js/insert.wasm`,
-                    `${args.artifactsPath ?? "../lib/circuits"}/insert/circuit_final.zkey`
+                    `${circuitsPath}/insert/insert_js/insert.wasm`,
+                    `${circuitsPath}/insert/circuit_final.zkey`
                 ));
 
                 result.proof = proof;
@@ -178,8 +179,8 @@ export async function execQuery(db: Database, query: string, argsCommit: bigint,
             if (prove) {
                 const {proof, solidityProof, newTableCommit} = await unpackProof(plonk.fullProve(
                     result.inputs,
-                    `${args.artifactsPath ?? "../lib/circuits"}/update/update_js/update.wasm`,
-                    `${args.artifactsPath ?? "../lib/circuits"}/update/circuit_final.zkey`
+                    `${circuitsPath}/update/update_js/update.wasm`,
+                    `${circuitsPath}/update/circuit_final.zkey`
                 ));
 
                 result.proof = proof;
@@ -210,8 +211,8 @@ export async function execQuery(db: Database, query: string, argsCommit: bigint,
             if (prove) {
                 const {proof, solidityProof, newTableCommit} = await unpackProof(plonk.fullProve(
                     result.inputs,
-                    `${args.artifactsPath ?? "../lib/circuits"}/delete/delete_js/delete.wasm`,
-                    `${args.artifactsPath ?? "../lib/circuits"}/delete/circuit_final.zkey`
+                    `${circuitsPath}/delete/delete_js/delete.wasm`,
+                    `${circuitsPath}/delete/circuit_final.zkey`
                 ));
 
                 result.proof = proof;

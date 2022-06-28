@@ -1,7 +1,7 @@
 #!/bin/bash
 
 CIRCUIT_NAME=$1
-OUTPUT_DIR=../lib/circuits
+OUTPUT_DIR=../lib/artifacts/circuits
 
 cd circuits
 

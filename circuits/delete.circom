@@ -10,7 +10,7 @@ template DELETE(nColumns,nRows,nAND,nOR) {
     signal input table[nRows][nColumns];
     signal input tableCommit;
 
-    signal input whereConditions[nOR][nAND][2];
+    signal input whereConditions[nOR][nAND][3];
     signal input argsCommit;
 
     signal output newTableCommit;
@@ -21,14 +21,15 @@ template DELETE(nColumns,nRows,nAND,nOR) {
     var k;
 
     // Hash arguments
-    component preImage = CalculateTotal(nOR*nAND*2);
+    component preImage = CalculateTotal(nOR*nAND*3);
     component argsHasher = Poseidon(1);
 
     for (i=0;i<nOR;i++) {
         for (j=0;j<nAND;j++) {
-            var idx = i*nAND*2+j*2;
+            var idx = i*nAND*3+j*3;
             preImage.nums[idx] <== whereConditions[i][j][0];
             preImage.nums[idx+1] <== whereConditions[i][j][1];
+            preImage.nums[idx+2] <== whereConditions[i][j][2];
         }
     }
     
@@ -80,9 +81,10 @@ template DELETE(nColumns,nRows,nAND,nOR) {
                 isFilterColumn[i][k][j].in[0] <== header[j];
                 isFilterColumn[i][k][j].in[1] <== whereConditions[k][j][0];
 
-                equalCell[i][k][j] = IsEqual();
-                equalCell[i][k][j].in[0] <== whereConditions[k][j][1] * isFilterColumn[i][k][j].out;
-                equalCell[i][k][j].in[1] <== table[i][j] * isFilterColumn[i][k][j].out;
+                equalCell[i][k][j] = IsFiltered();
+                equalCell[i][k][j].in[0] <== table[i][j] * isFilterColumn[i][k][j].out;
+                equalCell[i][k][j].op <== whereConditions[k][j][1];
+                equalCell[i][k][j].in[1] <== whereConditions[k][j][2] * isFilterColumn[i][k][j].out;
                 
                 filterRowAND[i][k].in[j] <== equalCell[i][k][j].out;
             }

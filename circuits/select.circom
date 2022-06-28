@@ -11,7 +11,7 @@ template SELECT(nColumns, nRows, nAND, nOR) {
     signal input tableCommit;
 
     signal input fields[nColumns];
-    signal input whereConditions[nOR][nAND][2];
+    signal input whereConditions[nOR][nAND][3];
 
     signal input results[nRows][nColumns];
 
@@ -64,9 +64,10 @@ template SELECT(nColumns, nRows, nAND, nOR) {
                 isFilterColumn[i][k][j].in[0] <== header[j];
                 isFilterColumn[i][k][j].in[1] <== whereConditions[k][j][0];
 
-                equalCell[i][k][j] = IsEqual();
-                equalCell[i][k][j].in[0] <== whereConditions[k][j][1] * isFilterColumn[i][k][j].out;
-                equalCell[i][k][j].in[1] <== table[i][j] * isFilterColumn[i][k][j].out;
+                equalCell[i][k][j] = IsFiltered();
+                equalCell[i][k][j].in[0] <== table[i][j] * isFilterColumn[i][k][j].out;
+                equalCell[i][k][j].op <== whereConditions[k][j][1];
+                equalCell[i][k][j].in[1] <== whereConditions[k][j][2] * isFilterColumn[i][k][j].out;
 
                 filterRowAND[i][k].in[j] <== equalCell[i][k][j].out;
             }

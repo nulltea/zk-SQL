@@ -19,7 +19,7 @@ describe("zk-SQL - Contracts", () => {
 
     const circuitParams: CircuitParams = {
         maxAND: 5, maxOR: 2, maxRows: 10, maxCols: 5,
-        artifactsPath: "./lib/circuits"
+        artifactsPath: "./lib/artifacts/circuits"
     }
     const knownTables = new Map<string, string[]>([
         ["table1", ["f1", "f2", "f3", "f4", "f5"]],

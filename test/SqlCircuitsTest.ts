@@ -37,7 +37,7 @@ describe("zk-SQL - Circuits", () => {
     const header = table.columns.map(c => c.name);
     const circuitParams: CircuitParams = {
         maxAND: 5, maxOR: 2, maxRows: 10, maxCols: 5,
-        artifactsPath: "./lib/circuits"
+        artifactsPath: "./lib/artifacts/circuits"
     }
     const knownTables = new Map<string, string[]>([
         ["table1", ["f1", "f2", "f3", "f4", "f5"]],
@@ -76,6 +76,41 @@ describe("zk-SQL - Circuits", () => {
 
     it("SELECT * FROM table1 WHERE (f2 = 4 AND f4 = 8) OR (f4 = 4)", async () => {
         const res = await execQuery(db, "SELECT * FROM table1 WHERE (f2 = 4 AND f4 = 8) OR (f4 = 4)", 0n, circuitParams, false);
+        const witness = await selectCircuit.calculateWitness(res.inputs, true);
+
+        assert(Fr.eq(Fr.e(witness[0]),Fr.e(1)));
+    });
+
+    it("SELECT * FROM table1 WHERE f2 != 4", async () => {
+        const res = await execQuery(db, "SELECT * FROM table1 WHERE f2 != 4", 0n, circuitParams, false);
+        const witness = await selectCircuit.calculateWitness(res.inputs, true);
+
+        assert(Fr.eq(Fr.e(witness[0]),Fr.e(1)));
+    });
+
+    it("SELECT * FROM table1 WHERE f2 < 4", async () => {
+        const res = await execQuery(db, "SELECT * FROM table1 WHERE f2 < 4", 0n, circuitParams, false);
+        const witness = await selectCircuit.calculateWitness(res.inputs, true);
+
+        assert(Fr.eq(Fr.e(witness[0]),Fr.e(1)));
+    });
+
+    it("SELECT * FROM table1 WHERE f2 > 3", async () => {
+        const res = await execQuery(db, "SELECT * FROM table1 WHERE f2 > 3", 0n, circuitParams, false);
+        const witness = await selectCircuit.calculateWitness(res.inputs, true);
+
+        assert(Fr.eq(Fr.e(witness[0]),Fr.e(1)));
+    });
+
+    it("SELECT * FROM table1 WHERE f2 <= 3", async () => {
+        const res = await execQuery(db, "SELECT * FROM table1 WHERE f2 <= 4", 0n, circuitParams, false);
+        const witness = await selectCircuit.calculateWitness(res.inputs, true);
+
+        assert(Fr.eq(Fr.e(witness[0]),Fr.e(1)));
+    });
+
+    it("SELECT * FROM table1 WHERE f2 >= 5", async () => {
+        const res = await execQuery(db, "SELECT * FROM table1 WHERE f2 >= 5", 0n, circuitParams, false);
         const witness = await selectCircuit.calculateWitness(res.inputs, true);
 
         assert(Fr.eq(Fr.e(witness[0]),Fr.e(1)));
