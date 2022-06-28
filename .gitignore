@@ -21,4 +21,4 @@ verifier.sol
 **/circuits/build/**/*.js
 **/typechain-types
 
-server/dist
+node/dist

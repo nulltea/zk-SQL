@@ -1,0 +1,3 @@
+{
+  "extends": ["next", "prettier", "plugin:valtio/recommended"]
+}
