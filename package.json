@@ -1,5 +1,30 @@
 {
-  "dependencies": {
-    "circomlibjs": "^0.1.6"
+  "name": "zk-sql-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build-types": "yarn hardhat typechain",
+    "start-node": "yarn workspace zk-sql-node start",
+    "start-ui": "yarn workspace zk-sql-ui dev",
+    "clean-node-modules": "rm -rf **/node_modules && rm -rf node_modules && rm -rf yarn.lock && rm -rf yarn-error.log"
+  },
+  "devDependencies": {
+    "dotenv": "^16.0.1",
+    "@nomiclabs/hardhat-ethers": "^2.0.6",
+    "@nomiclabs/hardhat-waffle": "^2.0.3",
+    "hardhat": "^2.9.9",
+    "typechain": "^8.1.0",
+    "typescript": "^4.7.4",
+    "@typechain/ethers-v5": "^10.1.0",
+    "@typechain/hardhat": "^6.1.2",
+    "ts-node": "^10.8.1"
+  },
+  "workspaces": {
+    "packages": ["lib", "node", "ui"],
+    "nohoist": ["**"]
+  },
+  "resolutions": {
+    "@types/react": "17.0.2",
+    "@types/react-dom": "17.0.2"
   }
 }
