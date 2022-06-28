@@ -31,7 +31,8 @@ Dependencies:
 - Node.js, yarn
 - make
 
-Go to server directory and create `.env` file (see example `.env.example`)
+### Environmental variables
+Go to each package directories [`lib`, `node`, `ui`] and create `.env` file (see example `.env.example`)
 ```bash
 cd nano .env
 ```
@@ -41,14 +42,19 @@ cd nano .env
 yarn install
 ```
 
-To build circuits and contract artifacts:
+### Build circuits and contracts:
 ```bash
 make build
 ```
 
-To run node (dev):
+### Run node (dev)
 ```bash
-npm start
+yarn start-node
+```
+
+### Run ui (dev)
+```bash
+yarn start-ui
 ```
 
 ## Limitations

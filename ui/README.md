@@ -12,13 +12,13 @@ nano .env
 ## Install dependencies
 
 ```bash
-make install
+yarn install
 ```
 
 ## Run the development server
 
 ```bash
-make dev
+yarn dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
