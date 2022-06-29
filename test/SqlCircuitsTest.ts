@@ -8,7 +8,6 @@ import {CircuitParams} from "zk-sql/engine/parser"
 import {commitToQuery, execQuery} from "zk-sql/engine/engine";
 import {db, initDB, Table} from "zk-sql/engine/database";
 import {tableCommitments} from "zk-sql/engine/chainListener";
-import {encodeSqlValue} from "zk-sql/engine/encode";
 import {hashTable} from "../lib/engine/hasher";
 
 describe("zk-SQL - Circuits", () => {

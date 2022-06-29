@@ -4,6 +4,7 @@ import {ZkSQL as IZkSQL} from "../types/typechain";
 import {CircuitParams} from "../engine/parser";
 import {commitToQuery, SqlRow} from "../engine/engine";
 import {genPublicSignals} from "../engine/verify";
+import {encodeSqlValue} from "../engine/encode";
 const buildPoseidon = require("circomlibjs").buildPoseidon;
 
 export type ClientConfig = {
@@ -69,7 +70,6 @@ export async function getSqlRequest(sql: string, token: string, cfg: ClientConfi
         }
     }
 
-
     clearTimeout(id);
 
     if (!res.ok) {
@@ -98,7 +98,7 @@ export async function getSqlRequest(sql: string, token: string, cfg: ClientConfi
     const contract = new Contract(process.env.ZK_SQL_CONTRACT!, ZkSQL.abi)
     const contractOwner = contract.connect(provider) as unknown as IZkSQL;
 
-    const tableHeader = new Map<string, number>(tableColumns.map((c) => [c, tableColumns.indexOf(c)+1]));
+    const tableHeader = new Map<string, bigint>(tableColumns.map((c) => [c, encodeSqlValue(c)]));
     const tableCommit = (await contractOwner.tableCommitments(table)).toBigInt();
 
     result.publicSignals = genPublicSignals(
@@ -115,7 +115,7 @@ export async function getSqlRequest(sql: string, token: string, cfg: ClientConfi
 
 
 export async function commitToTable(columns: string[]): Promise<bigint> {
-    let columnCodes = columns.map((c) => BigInt(columns.indexOf(c)+1))
+    let columnCodes = columns.map((c) => encodeSqlValue(c))
     let poseidon = await buildPoseidon();
     let preimage = columnCodes.reduce((sum, x) => sum + x, 0n);
     return poseidon.F.toObject(poseidon([preimage]));

@@ -1,15 +1,15 @@
 import {Controller} from "@tsed/di";
 import {Get, Post} from "@tsed/schema";
 import {BodyParams} from "@tsed/platform-params";
-import {createTable, Table, writeDB} from "../../../../lib/engine/database";
+import {createTable, Table, writeDB} from "zk-sql/engine/database";
 import {
     pendingTablesToCreate,
-} from "../../../../lib/engine/chainListener";
+} from "zk-sql/engine/chainListener";
 import {backOff} from "exponential-backoff";
+import {commitToTable} from "zk-sql/client/client";
 
 
 export type CreateTableRequest = {
-    commit: string,
     table: Table,
 }
 
@@ -18,7 +18,8 @@ export type CreateTableRequest = {
 export class CreateTableController {
     @Post()
     async updatePayload(@BodyParams() payload: CreateTableRequest): Promise<{}> {
-        const commit = BigInt(payload.commit);
+        const commit = await commitToTable(payload.table.columns.map(c => c.name));
+        console.log(payload.table.columns.map(c => c.name), commit);
         await backOff(async () => {
             if (!pendingTablesToCreate.has(commit)) {
                 throw Error("unknown request, commit to on-chain");

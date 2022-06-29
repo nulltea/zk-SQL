@@ -1,12 +1,22 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import {getSqlRequest} from "zk-sql/client/client";
-import {getClientConfig} from "../config";
+import {clientConfig, getClientConfig} from "../config";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const {sql, token} = JSON.parse(req.body);
-  try {
 
-    const {ready, selected, changeCommit, proof, error, publicSignals} = await getSqlRequest(sql, token, await getClientConfig());
+  try {
+    await getClientConfig()
+  } catch (e) {
+    res.json({
+      ready: false,
+    });
+
+    return;
+  }
+
+  try {
+    const {ready, selected, changeCommit, proof, error, publicSignals} = await getSqlRequest(sql, token, clientConfig);
 
     if (!ready) {
       res.json({

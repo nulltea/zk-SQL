@@ -56,13 +56,17 @@ export function TablesSelector() {
     const provider = new ethers.providers.Web3Provider(window.ethereum);
     const contractOwner = contract.connect(provider.getSigner()) as IZkSQL;
     const commit = await commitToTable(columns)
+
     await contractOwner.createTable(values.name, commit);
     fetch('/api/table/create', {
       method: 'POST',
       body: JSON.stringify({
         table: {
           name: values.name,
-          columns,
+          columns: columns.map(c => ({
+            name: c,
+            type: "int"
+          })),
         },
         commit: commit.toString()
       })

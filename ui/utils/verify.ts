@@ -1,7 +1,7 @@
-import selectVKey from "zk-sql/artifacts/circuits/select/verification_key.json";
-import insertVKey from "zk-sql/artifacts/circuits/insert/verification_key.json";
-import updateVKey from "zk-sql/artifacts/circuits/update/verification_key.json";
-import deleteVKey from "zk-sql/artifacts/circuits/delete/verification_key.json";
+import selectVKey from "zk-sql/circuits/select/verification_key.json";
+import insertVKey from "zk-sql/circuits/insert/verification_key.json";
+import updateVKey from "zk-sql/circuits/update/verification_key.json";
+import deleteVKey from "zk-sql/circuits/delete/verification_key.json";
 
 const {plonk} = require("snarkjs");
 

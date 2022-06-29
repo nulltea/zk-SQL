@@ -36,6 +36,7 @@
     "lodash.clonedeep": "^4.5.0",
     "next": "12.1.0",
     "next-transpile-modules": "^9.0.0",
+    "util": "0.12.4",
     "os": "^0.1.2",
     "path-browserify": "1.0.1",
     "process": "0.11.10",

@@ -15,11 +15,17 @@ export async function getClientConfig(): Promise<ClientConfig> {
 }
 
 export async function getKnownTables(): Promise<Map<string, string[]>> {
-  const res = await fetch(`${clientConfig.serverAddress}/api/tables`);
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), 2000);
+  const res = await fetch(`${clientConfig.serverAddress}/api/tables`, {
+    signal: controller.signal
+  });
 
   if (!res.ok) {
     throw Error(res.statusText);
   }
+
+  clearTimeout(id);
 
   return new Map<string, string[]>(Object.entries(await res.json()));
 }

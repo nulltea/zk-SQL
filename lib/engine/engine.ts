@@ -78,7 +78,7 @@ export async function execQuery(db: Database, query: string, argsCommit: bigint,
     [...Array(args.maxCols - headerMap.size)].map(_ => tableColumnsCodes.push(0n));
 
     const tableCommit = tableCommitments.get(tableName)!;
-    const circuitsPath = args.artifactsPath ?? "../lib/artifacts/circuits"
+    const circuitsPath = args.artifactsPath ?? "../lib/circuits"
 
     switch (ast.type) {
         case "select": {
@@ -86,10 +86,12 @@ export async function execQuery(db: Database, query: string, argsCommit: bigint,
             if (Array.isArray(ast.columns)) {
                 ast.columns.unshift({expr: {type: "column_ref", table: null, column: "id"}, as: 'id'});
             }
+
             const selected = db.exec(parser.sqlify(ast))[0] ?? {
                 columns: ["id"].concat(tableColumns),
                 values: []
             }
+
             selected.columns.shift();
             let formattedView = formatSqlValues(selected.values);
             const results = formatForCircuit(selected.columns, formattedView, headerMap, args);
