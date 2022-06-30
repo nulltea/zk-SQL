@@ -1,7 +1,7 @@
 import {Controller} from "@tsed/di";
 import {Post} from "@tsed/schema";
 import {BodyParams} from "@tsed/platform-params";
-import {execQuery, SqlRow, typeOfQuery} from "zk-sql/engine/engine";
+import {execQuery, SqlRow, getQueryMetadata, getTableColumns} from "zk-sql/engine/engine";
 import {db, initDB, writeDB} from "zk-sql/engine/database";
 import {getSqlOpcode, pendingRequests, provider, tableCommitments, zkSqlContract} from "zk-sql/engine/chainListener";
 import {backOff} from "exponential-backoff";
@@ -24,8 +24,6 @@ export type SqlResponse = {
     error?: string
 }
 
-const mutex = new Mutex();
-
 export const requests = new Map<string, SqlResponse>();
 
 
@@ -34,7 +32,7 @@ export class RequestController {
     @Post()
     async updatePayload(@BodyParams() payload: SqlRequest): Promise<{ error?: string, token?: string }> {
         try {
-            const type = typeOfQuery(payload.sql);
+            const {type} = getQueryMetadata(payload.sql);
             const argsCommit = BigInt(payload.commit);
 
             if (type != "select") {
@@ -68,7 +66,6 @@ export class RequestController {
                     const newCommitment = res.publicInputs![0];
                     await zkSqlContract.execRequest(getSqlOpcode(type), argsCommit, newCommitment, res.solidityProof!)
                     tableCommitments.set(res.tableName, argsCommit);
-                    // await delay(1000);
                     writeDB();
                 }
 
@@ -83,7 +80,7 @@ export class RequestController {
             });
 
             return {
-                token
+                token,
             }
         } catch (e: any) {
             await initDB(true);

@@ -9,13 +9,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const {commit, table, type} = await commitToQuery(sql, knownTables, clientConfig.circuitParams);
     if (type === 'select') {
       res.json({
-        commitExpected: false
+        commitExpected: false,
+        columns: knownTables.get(table),
       })
     } else {
       res.json({
         commitExpected: true,
         table,
-        commit: commit.toString()
+        commit: commit.toString(),
+        columns: knownTables.get(table),
       })
     }
   } catch (error: any) {

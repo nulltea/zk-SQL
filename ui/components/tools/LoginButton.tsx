@@ -1,11 +1,7 @@
-import { FC } from 'react';
 import { useLogin } from '../../hooks/useLogin';
 import {Button} from "@chakra-ui/react";
 
-interface LoginModalButtonProps {
-}
-
-export const LoginButton: FC<LoginModalButtonProps> = ({ }) => {
+export const LoginButton = ({loggedAddress}) => {
   const { isLoggedIn, address, login } = useLogin();
 
   return (
@@ -18,3 +14,4 @@ export const LoginButton: FC<LoginModalButtonProps> = ({ }) => {
     </>
   );
 };
+

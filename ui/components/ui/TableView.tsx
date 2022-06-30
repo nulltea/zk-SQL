@@ -1,4 +1,4 @@
-import React, {FC, useEffect, useState} from "react";
+import React, {FC, useEffect, useMemo, useState} from "react";
 import {useForm} from 'react-hook-form';
 import {
   FormErrorMessage,
@@ -10,7 +10,7 @@ import {
   Input,
   Box,
   Flex,
-  Button,
+  Button, Spinner, Skeleton, Stack, Text, Center,
 } from '@chakra-ui/react'
 import {CheckIcon} from "@chakra-ui/icons";
 import {useTable} from 'react-table';
@@ -27,17 +27,33 @@ interface TableViewProps {
 
 export const TableView: FC<TableViewProps> = () => {
   const router = useRouter()
-  const [tableName, setTableName] = useState("")
+  const [tableName, setTableName] = useState("");
   const [columns, setColumns] = useState([]);
   const [values, setValues] = useState([]);
   const [isLoading, setLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState("");
   const [error, setError] = useState(null);
   const [proof, setProof] = useState(null);
-  const [reqMade, setReqMade] = useState(0);
   const [publicSignals, setPublicSignals] = useState([]);
+  let reqMade = 0;
+
+  const tableData = useMemo(
+    () => (isLoading ? Array(5).fill({}) : values),
+    [isLoading, values]
+  );
+  const tableColumns = useMemo(
+    () =>
+      isLoading
+        ? columns.map((column) => ({
+          ...column,
+          Cell: <Skeleton isLoaded={!isLoading} height='30px'></Skeleton>,
+        }))
+        : columns,
+    [isLoading, columns]
+  );
 
   const {getTableProps, getTableBodyProps, headerGroups, rows, prepareRow} =
-    useTable({columns, data: values});
+    useTable({columns: tableColumns, data: tableData});
 
   useEffect(() => {
     if (!router.isReady) return;
@@ -68,31 +84,36 @@ export const TableView: FC<TableViewProps> = () => {
           const contractOwner = contract.connect(provider.getSigner()) as IZkSQL;
           return contractOwner.request(table, BigInt(commit)).then(() => values.sql);
         }
+        // todo: make download proof a floating button, make loading a toast popup
         return values.sql;
       }).then((sql) => {
       setLoading(true);
+      setLoadingMessage("Connecting to the node...");
       fetch('/api/table/request', {
         method: 'POST',
         body: JSON.stringify({
           sql
         })
       }).then((res) => res.json())
-        .then(({token, error}) => {
+        .then(({token, tableCommit, error}) => {
           if (error != null) {
             setError(error);
             setLoading(false);
             return;
           }
-          poll(sql, token)
+
+          setLoadingMessage("Querying data.");
+          poll(sql, tableCommit, token)
         });
     });
   }
 
-  async function poll(sql: string, token: string) {
+  async function poll(sql: string, tableCommit: string, token: string) {
     let res: SqlQueryResult = await fetch('/api/table/query', {
       method: 'POST',
       body: JSON.stringify({
         token,
+        tableCommit,
         sql
       })
     }).then((res) => res.json());
@@ -102,8 +123,9 @@ export const TableView: FC<TableViewProps> = () => {
         setLoading(false);
         setError("request timed out");
       }
-      setReqMade(reqMade + 1);
-      return new Promise(resolve => setTimeout(resolve, 2000)).then(() => poll(sql, token));
+      reqMade++;
+      setLoadingMessage(`Querying data${[...Array(reqMade % 3+1)].map(_ => ".").join("")}`);
+      return new Promise(resolve => setTimeout(resolve, 2000)).then(() => poll(sql, tableCommit, token));
     }
 
     if (res.error != null) {
@@ -117,7 +139,9 @@ export const TableView: FC<TableViewProps> = () => {
       setValues(res.selected.values);
     }
 
-    const isVerified = await verifyProof("select", res.publicSignals, res.proof);
+    setLoadingMessage(`Verifying proof...`);
+
+    const isVerified = await verifyProof(res.type, res.publicSignals, res.proof);
 
     if (!isVerified) {
       setLoading(false);
@@ -126,7 +150,9 @@ export const TableView: FC<TableViewProps> = () => {
 
     setProof(res.proof);
     setPublicSignals(res.publicSignals);
-    setLoading(false);
+    setTimeout(function () {
+      setLoading(false);
+    }, 1000);
   }
 
   function exportProof() {
@@ -142,7 +168,14 @@ export const TableView: FC<TableViewProps> = () => {
     }
   }
 
-  if (isLoading) return <p>Loading...</p>
+  if (isLoading && columns.length == 0) return (
+    <Center>
+      <Stack padding={4} spacing={1}>
+        <Spinner/>
+        <Text fontSize='xl'>{loadingMessage}</Text>
+      </Stack>
+    </Center>
+  )
   if (error != null) return <p>Error: {error}</p>
 
   return (

@@ -133,7 +133,7 @@ export function parseSelect(ast: AST, header: Map<string, bigint>, args: Circuit
 export function parseInsert(ast: AST, args: CircuitParams): InsertQuery {
     if ("values" in ast && ast.values !== null && Array.isArray(ast.values)) {
         return {
-            insertValues: ast.values[0].value.map((e) => "value" in e ? encodeSqlValue(e.value) : 0n)
+            insertValues: [...Array(args.maxCols)].map((_, i) => ast.values[0].value[i] ? encodeSqlValue(ast.values[0].value[i].value) : 0n)
         }
     }
 

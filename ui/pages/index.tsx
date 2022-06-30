@@ -3,6 +3,8 @@ import { MainLayout } from '../components/ui/MainLayout';
 import { HeaderMenu } from '../components/ui/HeaderMenu';
 import { HeaderMenuButtons } from '../components/ui/HeaderMenuButtons';
 import {TablesSelector} from "../components/ui/TablesSelector";
+import {setLoggedInState} from "../store/auth";
+import cookie from "cookie";
 
 declare global {
   interface Window{
@@ -10,7 +12,12 @@ declare global {
   }
 }
 
-const Home: NextPage = () => {
+const Home = ({loggedAddress}) => {
+  setLoggedInState({
+    isLoggedIn: loggedAddress != undefined,
+    address: loggedAddress,
+  });
+
   return (
     <MainLayout>
       <HeaderMenu>
@@ -20,5 +27,13 @@ const Home: NextPage = () => {
     </MainLayout>
   );
 };
+
+Home.getInitialProps = ({req}) => {
+  const cookieVal = cookie.parse(req ? req.headers.cookie || "" : document.cookie);
+
+  return {
+    loggedAddress: cookieVal.metamaskAddress
+  }
+}
 
 export default Home;

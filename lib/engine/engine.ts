@@ -322,7 +322,13 @@ function getTable(db: Database, tableName: string, args: CircuitParams): {
     }
 }
 
-export function typeOfQuery(query: string): string {
+export function getTableColumns(db: Database, tableName: string): string[] {
+    const columns = db.exec(`PRAGMA table_info(${tableName})`)[0].values.map((cref) => cref[1] as string);
+    columns.shift();
+    return columns;
+}
+
+export function getQueryMetadata(query: string): { type: string, tableName: string } {
     const parser = new Parser();
     let {ast} = parser.parse(query)
 
@@ -330,7 +336,9 @@ export function typeOfQuery(query: string): string {
         throw Error("bad query");
     }
 
-    return ast.type;
+    const tableName = parseTableName(ast);
+
+    return {type: ast.type, tableName};
 }
 
 export function parseTableName(ast: AST): string {

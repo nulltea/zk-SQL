@@ -16,6 +16,7 @@ export type ClientConfig = {
 
 export type SqlQueryResult = {
     ready: boolean
+    type?: string,
     selected?: {
         columns: string[],
         values: SqlRow[]
@@ -29,10 +30,15 @@ export type SqlQueryResult = {
 export type SqlRequestResponse = {
     error?: string,
     token?: string,
+    tableCommit?: string,
 }
 
 export async function postSqlRequest(sql: string, cfg: ClientConfig): Promise<SqlRequestResponse> {
-    const {commit} = await commitToQuery(sql, cfg.knownTables, cfg.circuitParams);
+    const provider = new providers.JsonRpcProvider(process.env.CHAIN_RPC)
+    const contract = new Contract(process.env.ZK_SQL_CONTRACT!, ZkSQL.abi)
+    const contractOwner = contract.connect(provider) as unknown as IZkSQL;
+    const {commit, table} = await commitToQuery(sql, cfg.knownTables, cfg.circuitParams);
+    const tableCommit = (await contractOwner.tableCommitments(table)).toBigInt();
 
     const res = await fetch(`${cfg.serverAddress}/api/request`, {
         method: "POST",
@@ -47,15 +53,18 @@ export async function postSqlRequest(sql: string, cfg: ClientConfig): Promise<Sq
 
     if (!res.ok) {
         return {
-            error: res.statusText
+            error: res.statusText,
         }
     }
 
-    return res.json();
+    const body: SqlRequestResponse = await res.json();
+    body.tableCommit = tableCommit.toString();
+
+    return body;
 }
 
 
-export async function getSqlRequest(sql: string, token: string, cfg: ClientConfig): Promise<SqlQueryResult> {
+export async function getSqlRequest(sql: string, tableCommit: string, token: string, cfg: ClientConfig): Promise<SqlQueryResult> {
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), 2000);
 
@@ -81,10 +90,8 @@ export async function getSqlRequest(sql: string, token: string, cfg: ClientConfi
 
     let result: SqlQueryResult = await res.json();
 
-    if (!result.ready) {
-        return {
-            ready: false,
-        }
+    if (!result.ready || result.error != null) {
+        return result;
     }
 
     const {commit, table, type} = await commitToQuery(sql, cfg.knownTables, cfg.circuitParams);
@@ -99,14 +106,14 @@ export async function getSqlRequest(sql: string, token: string, cfg: ClientConfi
     const contractOwner = contract.connect(provider) as unknown as IZkSQL;
 
     const tableHeader = new Map<string, bigint>(tableColumns.map((c) => [c, encodeSqlValue(c)]));
-    const tableCommit = (await contractOwner.tableCommitments(table)).toBigInt();
 
+    result.type = type;
     result.publicSignals = genPublicSignals(
         sql,
         commit,
         tableHeader,
         cfg.circuitParams,
-        tableCommit,
+        BigInt(tableCommit),
         type == "select" ? result.selected!.values : result.changeCommit
     );
 
