@@ -22,8 +22,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   } catch (error: any) {
     console.log("prepare error:", error);
-    const { message } = JSON.parse(error.body).error
-    const reason = message.substring(message.indexOf("'") + 1, message.lastIndexOf("'"))
-    res.status(500).send(reason || "Unknown error!")
+    res.json({
+      error: error.toString().split('\n')[0],
+    });
   }
 }

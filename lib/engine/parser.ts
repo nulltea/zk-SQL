@@ -146,9 +146,12 @@ export function parseUpdate(ast: AST, header: Map<string, bigint>, args: Circuit
         where = parseWhere(ast.where, header, args);
     }
 
+    const columnCodes = Array.from(header.values());
+
     let setExpressions = [];
     if ("set" in ast && ast.set !== null) {
-        for (let columnCode of header.values()) {
+        for (let i = 0; i < args.maxCols; i++) {
+            let columnCode = columnCodes[i];
             let cond = ast.set.find((c) => header.get(c.column) == columnCode);
             if (cond !== undefined) {
                 if ("value" in cond) {

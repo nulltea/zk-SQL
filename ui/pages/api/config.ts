@@ -1,10 +1,12 @@
 import {ClientConfig} from "zk-sql/client/client";
-import {backOff} from "exponential-backoff";
 
 export const clientConfig: ClientConfig = {
   serverAddress: process.env.SERVER_ADDRESS!,
   circuitParams: {
-    maxAND: 5, maxOR: 2, maxRows: 10, maxCols: 5
+    maxAND: Number(process.env.MAX_AND!),
+    maxOR: Number(process.env.MAX_OR!),
+    maxRows: Number(process.env.MAX_ROWS!),
+    maxCols: Number(process.env.MAX_COLUMNS!)
   },
   knownTables: new Map<string, string[]>(),
   circuitsPath: "../server/circuits/build"

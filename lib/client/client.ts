@@ -101,10 +101,6 @@ export async function getSqlRequest(sql: string, tableCommit: string, token: str
         throw Error("unknown table");
     }
 
-    const provider = new providers.JsonRpcProvider(process.env.CHAIN_RPC)
-    const contract = new Contract(process.env.ZK_SQL_CONTRACT!, ZkSQL.abi)
-    const contractOwner = contract.connect(provider) as unknown as IZkSQL;
-
     const tableHeader = new Map<string, bigint>(tableColumns.map((c) => [c, encodeSqlValue(c)]));
 
     result.type = type;

@@ -10,7 +10,7 @@ import "@tsed/ajv";
 import "@tsed/swagger";
 import {config} from "./config";
 import * as rest from "./controllers/api";
-import {initDB} from "zk-sql/engine/database";
+import {createTable, initDB, writeDB} from "zk-sql/engine/database";
 import {listenToChain} from "zk-sql/engine/chainListener";
 
 

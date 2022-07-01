@@ -142,41 +142,41 @@ template IsFiltered() {
     isNe.in[0] <== op;
     isNe.in[1] <== 1;
 
-    component lt = LessThan(8);
-    component isLt = IsEqual();
-    lt.in[0] <== in[0];
-    lt.in[1] <== in[1];
-    isLt.in[0] <== op;
-    isLt.in[1] <== 2;
+    // component lt = LessThan(32);
+    // component isLt = IsEqual();
+    // lt.in[0] <== in[0];
+    // lt.in[1] <== in[1];
+    // isLt.in[0] <== op;
+    // isLt.in[1] <== 2;
 
-    component gt = GreaterThan(8);
-    component isGt = IsEqual();
-    gt.in[0] <== in[0];
-    gt.in[1] <== in[1];
-    isGt.in[0] <== op;
-    isGt.in[1] <== 3;
+    // component gt = GreaterThan(32);
+    // component isGt = IsEqual();
+    // gt.in[0] <== in[0];
+    // gt.in[1] <== in[1];
+    // isGt.in[0] <== op;
+    // isGt.in[1] <== 3;
 
-    component lte = LessEqThan(8);
-    component isLte = IsEqual();
-    lte.in[0] <== in[0];
-    lte.in[1] <== in[1];
-    isLte.in[0] <== op;
-    isLte.in[1] <== 4;
+    // component lte = LessEqThan(32);
+    // component isLte = IsEqual();
+    // lte.in[0] <== in[0];
+    // lte.in[1] <== in[1];
+    // isLte.in[0] <== op;
+    // isLte.in[1] <== 4;
 
-    component gte = GreaterEqThan(8);
-    component isGte = IsEqual();
-    gte.in[0] <== in[0];
-    gte.in[1] <== in[1];
-    isGte.in[0] <== op;
-    isGte.in[1] <== 5;
+    // component gte = GreaterEqThan(32);
+    // component isGte = IsEqual();
+    // gte.in[0] <== in[0];
+    // gte.in[1] <== in[1];
+    // isGte.in[0] <== op;
+    // isGte.in[1] <== 5;
 
-    component res = CalculateTotal(6);
+    component res = CalculateTotal(2);
     res.nums[0] <== eq.out * isEq.out;
     res.nums[1] <== ne.out * isNe.out;
-    res.nums[2] <== lt.out * isLt.out;
-    res.nums[3] <== gt.out * isGt.out;
-    res.nums[4] <== lte.out * isLte.out;
-    res.nums[5] <== gte.out * isGte.out;
+    // res.nums[2] <== lt.out * isLt.out;
+    // res.nums[3] <== gt.out * isGt.out;
+    // res.nums[4] <== lte.out * isLte.out;
+    // res.nums[5] <== gte.out * isGte.out;
 
     out <== res.sum;
 }

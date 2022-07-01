@@ -176,13 +176,13 @@ export async function execQuery(db: Database, query: string, argsCommit: bigint,
                     setExpressions: parsed.setExpressions,
                     argsCommit: argsCommit,
                 }
-            };
+            }
 
             if (prove) {
                 const {proof, solidityProof, newTableCommit} = await unpackProof(plonk.fullProve(
                     result.inputs,
                     `${circuitsPath}/update/update_js/update.wasm`,
-                    `${circuitsPath}/update/circuit_final.zkey`
+                    `${circuitsPath}/update/circuit_final.zkey`, console
                 ));
 
                 result.proof = proof;

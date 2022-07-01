@@ -19,6 +19,7 @@ import ZkSQL from "zk-sql/artifacts/contracts/zkSQL.sol/ZkSQL.json";
 import {ZkSQL as IZkSQL} from "zk-sql/types/typechain";
 import {Contract, ethers} from "ethers";
 import {verifyProof} from "../../utils/verify";
+import {UseToastOptions} from "@chakra-ui/toast/dist/declarations/src/use-toast";
 
 interface TableViewProps {
   tableName: string,
@@ -37,10 +38,13 @@ export const TableView: FC<TableViewProps> = ({tableName, columnNames}) => {
   const [publicSignals, setPublicSignals] = useState([]);
   const toast = useToast();
   const toastIdRef = React.useRef<ToastId>();
+  const maxRows = Number(process.env.NEXT_PUBLIC_MAX_ROWS!);
+  const [numRows, setNumRows] = useState(5);
   let reqMade = 0;
 
+
   const data = useMemo(
-    () => (isLoading ? Array(5).fill({}) : values),
+    () => (isLoading ? Array(numRows).fill({}) : values),
     [isLoading, values]
   );
   const columns = useMemo(
@@ -70,13 +74,31 @@ export const TableView: FC<TableViewProps> = ({tableName, columnNames}) => {
   } = useForm()
 
   async function makeQuery(values: { sql: string }) {
+    if (values.sql.toLowerCase().includes("insert")) {
+      if (data.length >= maxRows) {
+        showFeedback({
+          title: "Limit exceeded",
+          description: `Prover supports no more than ${maxRows} rows. Contact host or create another table.`,
+          status: "warning",
+          duration: 6000,
+          isClosable: true
+        })
+        return;
+      }
+
+      setNumRows(numRows + 1);
+    }
     fetch('/api/table/prepare', {
       method: 'POST',
       body: JSON.stringify({
         sql: values.sql
       })
     }).then((res) => res.json())
-      .then(({commitExpected, table, commit}) => {
+      .then(({error, commitExpected, table, commit}) => {
+        if (error !== undefined) {
+          showFeedback({title: "Error occurred", status: "error", description: error,  duration: 9000});
+          return null;
+        }
         if (commitExpected) {
           const contract = new Contract(process.env.NEXT_PUBLIC_ZK_SQL_CONTRACT!, ZkSQL.abi);
           const provider = new ethers.providers.Web3Provider(window.ethereum);
@@ -85,6 +107,7 @@ export const TableView: FC<TableViewProps> = ({tableName, columnNames}) => {
         }
         return values.sql;
       }).then((sql) => {
+      if (sql == null) return;
       setLoading(true);
       showFeedback({title: "Please wait", status: "info", description: "Connecting to the node...", duration: null});
       fetch('/api/table/request', {
@@ -144,6 +167,7 @@ export const TableView: FC<TableViewProps> = ({tableName, columnNames}) => {
     if (selected != null) {
       setValues(selected.values);
       setColumns(selected.columns);
+      setNumRows(selected.values.length);
     }
 
     showFeedback({description: "Verifying proof..."});
@@ -176,7 +200,7 @@ export const TableView: FC<TableViewProps> = ({tableName, columnNames}) => {
     }
   }
 
-  function showFeedback(params) {
+  function showFeedback(params: UseToastOptions) {
     if (toastIdRef.current == null) {
       toastIdRef.current = toast(params);
     } else {
@@ -231,8 +255,7 @@ export const TableView: FC<TableViewProps> = ({tableName, columnNames}) => {
           <FormControl>
             <Input variant='filled' backgroundColor='dappTemplate.dark.darker' h='45px'
               id='sql'
-              placeholder={`SELECT *
-                              FROM ${tableName}`}
+              placeholder={`SELECT * FROM ${tableName}`}
               {...register('sql', {
                 required: 'This is required',
               })}

@@ -1,8 +1,8 @@
 import React, {useEffect, useState} from "react";
-import Link from 'next/link';
 import {useFieldArray, useForm} from 'react-hook-form';
 import {
-  Grid, GridItem,
+  Grid,
+  GridItem,
   Modal,
   ModalOverlay,
   ModalContent,
@@ -11,7 +11,18 @@ import {
   ModalCloseButton,
   useDisclosure,
   Spinner,
-  Flex, FormControl, Input, FormErrorMessage, Box, Button, Select, LinkBox, Heading, LinkOverlay, Center,
+  Flex,
+  FormControl,
+  Input,
+  FormErrorMessage,
+  Box,
+  Button,
+  Select,
+  LinkBox,
+  Heading,
+  LinkOverlay,
+  Center,
+  useToast,
 } from '@chakra-ui/react'
 import {CardWrapper} from "./CardWrapper";
 import {Contract, ethers} from "ethers";
@@ -29,6 +40,7 @@ export function TablesSelector() {
   const [isLoading, setLoading] = useState(false);
   const [isModalLoading, setModalLoading] = useState(false)
   const [tables, setTables] = useState([]);
+  const toast = useToast();
   const {
     isOpen: opened,
     onOpen: open,
@@ -44,7 +56,7 @@ export function TablesSelector() {
     control,
     name: "columns",
   });
-
+  const maxColumns = Number(process.env.NEXT_PUBLIC_MAX_COLUMNS!);
 
   useEffect(() => {
     setLoading(true);
@@ -182,7 +194,19 @@ export function TablesSelector() {
                 ))
               }
               <Flex flexDirection='column'>
-                <Button variant='ghost' onClick={() => append({type: "int"})}>
+                <Button variant='ghost' onClick={() => {
+                  if (fields.length < maxColumns) {
+                    append({type: "int"})
+                  } else {
+                    toast({
+                      title: "Limit exceeded",
+                      description: `Prover supports no more than ${maxColumns} columns`,
+                      status: "warning",
+                      duration: 6000,
+                      isClosable: true
+                    })
+                  }
+                }}>
                   <AddIcon/>
                 </Button>
                 <Box h='15px'/>

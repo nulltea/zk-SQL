@@ -41,7 +41,7 @@ export function writeDB() {
 export function createTable(table: Table) {
     db.run(`CREATE TABLE ${table.name} (id INTEGER PRIMARY KEY AUTOINCREMENT, ${table.columns.map((c) => [c.name, c.type].join(' '))})`);
     table.values?.forEach((row) => {
-        db.run(`INSERT INTO table1 (${table.columns.map(c => c.name).join(',')}) VALUES (${row.map(v => sqlValueToStatement(v)).join(", ")})`);
+        db.run(`INSERT INTO ${table.name} (${table.columns.map(c => c.name).join(',')}) VALUES (${row.map(v => sqlValueToStatement(v)).join(", ")})`);
     });
 
     knownTables.set(table.name, table.columns.map(c => c.name));

@@ -2,11 +2,13 @@ import {CircuitParams, parseSelect} from "./parser";
 import {Parser} from "node-sql-parser/build/mysql";
 import {formatForCircuit, parseTableName} from "./engine";
 import * as fs from "fs";
+import {Logger} from "typechain/dist/utils/logger";
+
 
 const {plonk} = require("snarkjs");
 
 export function verifyProof(type: string, publicInputs: bigint[], proof: any, path?: string): Promise<any> {
-    const vKey = JSON.parse(fs.readFileSync(`${path ?? "circuits/build"}/${type}/verification_key.json`).toString());
+    const vKey = JSON.parse(fs.readFileSync(`${path ?? "circuits"}/${type}/verification_key.json`).toString());
     return plonk.verify(vKey, publicInputs, proof);
 }
 

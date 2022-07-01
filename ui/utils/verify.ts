@@ -5,9 +5,7 @@ import deleteVKey from "zk-sql/circuits/delete/verification_key.json";
 
 const {plonk} = require("snarkjs");
 
-export function verifyProof(type: string, publicInputs: any[], proof: any): Promise<any> {
-  console.log(type);
-
+export function verifyProof(type: string, publicInputs: any[], proof: any, ...logger: any[]): Promise<any> {
   let vKey = ((type) => {
     switch (type) {
       case "select":
@@ -22,6 +20,5 @@ export function verifyProof(type: string, publicInputs: any[], proof: any): Prom
         throw Error("unknown SQL operation");
     }
   })(type);
-  console.log(vKey, publicInputs.map(v => BigInt(v)), proof);
-  return plonk.verify(vKey, publicInputs.map(v => BigInt(v)), proof);
+  return plonk.verify(vKey, publicInputs.map(v => BigInt(v)), proof, logger[0] ?? console);
 }

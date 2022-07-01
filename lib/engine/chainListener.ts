@@ -15,7 +15,7 @@ export async function listenToChain(address: string) {
     const wallet = new Wallet(process.env.HARMONY_PRIVATE_KEY!, provider);
     const contract = new Contract(address, ZkSQL.abi);
 
-    zkSqlContract = contract.connect(provider.getSigner()) as IZkSQL;
+    zkSqlContract = contract.connect(wallet) as IZkSQL;
 
     tableCommitments = await requestAllTables(provider);
     discoverTables(db, Array.from(tableCommitments.keys()));
