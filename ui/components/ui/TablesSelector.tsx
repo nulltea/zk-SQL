@@ -11,13 +11,14 @@ import {
   ModalCloseButton,
   useDisclosure,
   Spinner,
-  Flex, FormControl, Input, FormErrorMessage, Box, Button, Select,
+  Flex, FormControl, Input, FormErrorMessage, Box, Button, Select, LinkBox, Heading, LinkOverlay, Center,
 } from '@chakra-ui/react'
 import {CardWrapper} from "./CardWrapper";
 import {Contract, ethers} from "ethers";
 import ZkSQL from "zk-sql/artifacts/contracts/zkSQL.sol/ZkSQL.json";
 import {ZkSQL as IZkSQL} from "zk-sql/types/typechain";
 import {commitToTable} from "zk-sql/client/client";
+import {AddIcon} from "@chakra-ui/icons";
 
 
 const CustomModalOverlay = () => {
@@ -44,8 +45,10 @@ export function TablesSelector() {
     name: "columns",
   });
 
+
   useEffect(() => {
     setLoading(true);
+    append({type: "int"});
     fetch('/api/tables').then((res) => res.json())
       .then((tables) => {
         setTables(tables);
@@ -83,17 +86,21 @@ export function TablesSelector() {
         {
           tables.map((table) => {
             return <GridItem w='100%' key={table}>
-              <CardWrapper h='100px' cursor='pointer'>
-                <Link href={`table?name=${table}`}>
-                  {table}
-                </Link>
-              </CardWrapper>
+              <LinkBox as='article' maxW='sm' p='8' backgroundColor='dappTemplate.dark.darker' borderRadius='2xl'>
+                <Heading size='md' my='2'>
+                  <LinkOverlay href={`table?name=${table}`}>{table}</LinkOverlay>
+                </Heading>
+              </LinkBox>
             </GridItem>
           })
         }
         <GridItem w='100%'>
-          <CardWrapper h='100px'>
-            <Button onClick={open} variant='ghost'>+</Button>
+          <CardWrapper maxW='sm' p='8' borderRadius='2xl' >
+            <Center>
+              <Button variant='ghost' colorScheme='grey' onClick={() => open()}>
+                <AddIcon/>
+              </Button>
+            </Center>
           </CardWrapper>
         </GridItem>
       </Grid>
@@ -175,8 +182,8 @@ export function TablesSelector() {
                 ))
               }
               <Flex flexDirection='column'>
-                <Button variant='ghost' onClick={() => append({})}>
-                  +
+                <Button variant='ghost' onClick={() => append({type: "int"})}>
+                  <AddIcon/>
                 </Button>
                 <Box h='15px'/>
                 <Button colorScheme='teal' isLoading={isSubmitting} type='submit'>

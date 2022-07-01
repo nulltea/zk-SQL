@@ -51,7 +51,8 @@
     "stream-browserify": "3.0.0",
     "swr": "2.0.0-beta.1",
     "util": "0.12.4",
-    "valtio": "1.4.0"
+    "valtio": "1.4.0",
+    "exponential-backoff": "^3.1.0"
   },
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.2",

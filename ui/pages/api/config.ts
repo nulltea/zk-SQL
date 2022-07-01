@@ -1,4 +1,5 @@
 import {ClientConfig} from "zk-sql/client/client";
+import {backOff} from "exponential-backoff";
 
 export const clientConfig: ClientConfig = {
   serverAddress: process.env.SERVER_ADDRESS!,
@@ -17,15 +18,14 @@ export async function getClientConfig(): Promise<ClientConfig> {
 export async function getKnownTables(): Promise<Map<string, string[]>> {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), 2000);
-  const res = await fetch(`${clientConfig.serverAddress}/api/tables`, {
+  const resp = await fetch(`${clientConfig.serverAddress}/api/tables`, {
     signal: controller.signal
   });
 
-  if (!res.ok) {
-    throw Error(res.statusText);
+  if (!resp.ok) {
+    throw Error(resp.statusText);
   }
 
   clearTimeout(id);
-
-  return new Map<string, string[]>(Object.entries(await res.json()));
+  return new Map<string, string[]>(Object.entries(await resp.json()));
 }
