@@ -11,7 +11,7 @@ const nextConfig = {
       process: require.resolve('process/browser'),
       events: require.resolve('process/browser'),
       assert: require.resolve("assert/"),
-      // util: require.resolve("util/"),
+      util: require.resolve("util/"),
       constants: require.resolve("constants/"),
       os: require.resolve("os/")
     };

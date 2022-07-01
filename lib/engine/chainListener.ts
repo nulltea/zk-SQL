@@ -15,7 +15,7 @@ export async function listenToChain(address: string) {
     const wallet = new Wallet(process.env.HARMONY_PRIVATE_KEY!, provider);
     const contract = new Contract(address, ZkSQL.abi);
 
-    zkSqlContract = contract.connect(wallet) as IZkSQL;
+    zkSqlContract = contract.connect(provider.getSigner()) as IZkSQL;
 
     tableCommitments = await requestAllTables(provider);
     discoverTables(db, Array.from(tableCommitments.keys()));
@@ -69,7 +69,6 @@ export async function requestAllTables(provider: Provider): Promise<Map<string, 
         return args.table;
     }));
 
-    tables = tables.concat(["table1"]);
     for (let table of tables) {
         const commitNumber = await zkSqlContract.tableCommitments(table);
         tablesMap.set(table, commitNumber.toBigInt());

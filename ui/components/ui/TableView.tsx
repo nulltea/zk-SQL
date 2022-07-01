@@ -1,4 +1,4 @@
-import React, {FC, useEffect, useState} from "react";
+import React, {FC, useEffect, useMemo, useState} from "react";
 import {useForm} from 'react-hook-form';
 import {
   FormErrorMessage,
@@ -10,7 +10,7 @@ import {
   Input,
   Box,
   Flex,
-  Button,
+  Button, Spinner, Skeleton, Stack, Text, Center, useToast, ToastId,
 } from '@chakra-ui/react'
 import {CheckIcon} from "@chakra-ui/icons";
 import {useTable} from 'react-table';
@@ -18,35 +18,50 @@ import {FlexCardWrapper} from "./CardWrapper";
 import ZkSQL from "zk-sql/artifacts/contracts/zkSQL.sol/ZkSQL.json";
 import {ZkSQL as IZkSQL} from "zk-sql/types/typechain";
 import {Contract, ethers} from "ethers";
-import {useRouter} from "next/router";
-import {SqlQueryResult} from "zk-sql/client/client";
 import {verifyProof} from "../../utils/verify";
 
 interface TableViewProps {
+  tableName: string,
+  columnNames: any[]
 }
 
-export const TableView: FC<TableViewProps> = () => {
-  const router = useRouter()
-  const [tableName, setTableName] = useState("")
-  const [columns, setColumns] = useState([]);
+export const TableView: FC<TableViewProps> = ({tableName, columnNames}) => {
   const [values, setValues] = useState([]);
-  const [isLoading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [tableColumns, setColumns] = useState(columnNames.map(cn => ({
+      Header: cn,
+      accessor: cn,
+      isNumeric: true,
+  })));
+  const [isLoading, setLoading] = useState(true);
   const [proof, setProof] = useState(null);
-  const [reqMade, setReqMade] = useState(0);
   const [publicSignals, setPublicSignals] = useState([]);
+  const toast = useToast();
+  const toastIdRef = React.useRef<ToastId>();
+  let reqMade = 0;
+
+  const data = useMemo(
+    () => (isLoading ? Array(5).fill({}) : values),
+    [isLoading, values]
+  );
+  const columns = useMemo(
+    () =>
+      isLoading
+        ? tableColumns.map((column) => ({
+          ...column,
+          Cell: <Skeleton isLoaded={!isLoading} height='25px'></Skeleton>,
+        }))
+        : tableColumns,
+    [isLoading, columnNames]
+  );
 
   const {getTableProps, getTableBodyProps, headerGroups, rows, prepareRow} =
-    useTable({columns, data: values});
+    useTable({columns, data});
 
   useEffect(() => {
-    if (!router.isReady) return;
-    const {name} = router.query;
-    setTableName(name.toString());
     makeQuery({
-      sql: `SELECT * FROM ${name.toString()}`
+      sql: `SELECT * FROM ${tableName}`
     });
-  }, [router.isReady]);
+  }, []);
 
   const {
     handleSubmit,
@@ -71,62 +86,81 @@ export const TableView: FC<TableViewProps> = () => {
         return values.sql;
       }).then((sql) => {
       setLoading(true);
+      showFeedback({title: "Please wait", status: "info", description: "Connecting to the node...", duration: null});
       fetch('/api/table/request', {
         method: 'POST',
         body: JSON.stringify({
           sql
         })
       }).then((res) => res.json())
-        .then(({token, error}) => {
+        .then(({token, tableCommit, error}) => {
           if (error != null) {
-            setError(error);
+            showFeedback({title: "Error occurred", status: "error", description: error,  duration: 9000});
             setLoading(false);
             return;
           }
-          poll(sql, token)
+
+          showFeedback({description: "Waiting for data."});
+          poll(sql, tableCommit, token)
         });
     });
   }
 
-  async function poll(sql: string, token: string) {
-    let res: SqlQueryResult = await fetch('/api/table/query', {
+  async function poll(sql: string, tableCommit: string, token: string) {
+    let {
+      ready,
+      error,
+      selected,
+      type,
+      proof,
+      publicSignals
+    } = await fetch('/api/table/query', {
       method: 'POST',
       body: JSON.stringify({
         token,
+        tableCommit,
         sql
       })
     }).then((res) => res.json());
 
-    if (!res.ready) {
+    if (!ready) {
       if (reqMade > 20) {
         setLoading(false);
-        setError("request timed out");
+        showFeedback({title: "Error occurred", status: "error", description: "Request timed out",  duration: 9000});
+
       }
-      setReqMade(reqMade + 1);
-      return new Promise(resolve => setTimeout(resolve, 2000)).then(() => poll(sql, token));
+      reqMade++;
+      showFeedback({description: `Waiting for data${[...Array(reqMade % 3+1)].map(_ => ".").join("")}`});
+      return new Promise(resolve => setTimeout(resolve, 2000)).then(() => poll(sql, tableCommit, token));
     }
 
-    if (res.error != null) {
+    if (error != null) {
       setLoading(false);
-      setError(res.error);
+      showFeedback({title: "Error occurred", status: "error", description: error,  duration: 9000});
+
       return;
     }
 
-    if (res.selected != null) {
-      setColumns(res.selected.columns);
-      setValues(res.selected.values);
+    if (selected != null) {
+      setValues(selected.values);
+      setColumns(selected.columns);
     }
 
-    const isVerified = await verifyProof("select", res.publicSignals, res.proof);
+    showFeedback({description: "Verifying proof..."});
+
+    const isVerified = await verifyProof(type, publicSignals, proof);
 
     if (!isVerified) {
       setLoading(false);
-      setError("proof verification failed!");
+      showFeedback({title: "Error occurred", status: "error", description: "Proof verification failed!",  duration: 9000});
     }
 
-    setProof(res.proof);
-    setPublicSignals(res.publicSignals);
+    setProof(proof);
+    setPublicSignals(publicSignals);
     setLoading(false);
+    setTimeout(function () {
+      showFeedback({title: "All done", description: "Proof verified!", status: "success", duration: 8000});
+    }, 1000);
   }
 
   function exportProof() {
@@ -142,8 +176,18 @@ export const TableView: FC<TableViewProps> = () => {
     }
   }
 
-  if (isLoading) return <p>Loading...</p>
-  if (error != null) return <p>Error: {error}</p>
+  function showFeedback(params) {
+    if (toastIdRef.current == null) {
+      toastIdRef.current = toast(params);
+    } else {
+      if (typeof params.duration == "number") {
+        params.onCloseComplete = () => {toastIdRef.current = null};
+      } else {
+        params.duration = null;
+      }
+      toast.update(toastIdRef.current, params);
+    }
+  }
 
   return (
     <Box>

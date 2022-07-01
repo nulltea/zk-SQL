@@ -22,7 +22,6 @@ contract ZkSQL {
         insertVerifier = insertVerifier_;
         updateVerifier = updateVerifier_;
         deleteVerifier = deleteVerifier_;
-        tableCommitments["table1"] = 6192063684007625405622444875231245009508356906093894343979231563958794510376;
     }
 
     function createTable(string memory table, uint256 commitment)

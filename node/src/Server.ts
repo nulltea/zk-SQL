@@ -53,17 +53,7 @@ export class Server implements BeforeInit {
     protected settings: Configuration;
 
     async $beforeInit(): Promise<any> {
-        await initDB(true, {
-            name: "table1",
-            columns: ["f1", "f2", "f3", "f4", "f5"],
-            values: [
-                [1, 4, 3, 4, 3],
-                [2, 3, 4, 3, 8],
-                [3, 4, 5, 8, 4],
-                [4, 5, 6, 7, 2],
-                [5, 4, 7, 8, 9],
-            ]
-        });
+        await initDB(true);
         await listenToChain(process.env.ZK_SQL_CONTRACT!);
     }
 }

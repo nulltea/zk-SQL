@@ -10,7 +10,7 @@ export function verifyProof(type: string, publicInputs: bigint[], proof: any, pa
     return plonk.verify(vKey, publicInputs, proof);
 }
 
-export function genPublicSignals(query: string, argsCommit: bigint, header: Map<string, number>, args: CircuitParams, tableCommit: bigint, ...inputs: any[]): bigint[]
+export function genPublicSignals(query: string, argsCommit: bigint, header: Map<string, bigint>, args: CircuitParams, tableCommit: bigint, ...inputs: any[]): bigint[]
 {
     const parser = new Parser();
     let {ast} = parser.parse(query)

@@ -20,12 +20,14 @@ template INSERT(c,r) {
     var j;
 
     // Hash arguments
-    component argsHasher = Poseidon(c);
+    component preImage = CalculateTotal(c);
+    component argsHasher = Poseidon(1);
 
     for (i=0;i<c;i++) {
-        argsHasher.inputs[i] <== insertValues[i];
+        preImage.nums[i] <== insertValues[i];
     }
 
+    argsHasher.inputs[0] <== preImage.sum;
     argsHasher.out === argsCommit;
 
 

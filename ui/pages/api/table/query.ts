@@ -1,12 +1,22 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import {getSqlRequest} from "zk-sql/client/client";
-import {getClientConfig} from "../config";
+import {clientConfig, getClientConfig} from "../config";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const {sql, token} = JSON.parse(req.body);
-  try {
+  const {sql, tableCommit, token} = JSON.parse(req.body);
 
-    const {ready, selected, changeCommit, proof, error, publicSignals} = await getSqlRequest(sql, token, await getClientConfig());
+  try {
+    await getClientConfig()
+  } catch (e) {
+    res.json({
+      ready: false,
+    });
+
+    return;
+  }
+
+  try {
+    const {ready, type, selected, changeCommit, proof, error, publicSignals} = await getSqlRequest(sql, tableCommit, token, clientConfig);
 
     if (!ready) {
       res.json({
@@ -42,6 +52,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       res.json({
         ready: true,
+        type,
         selected: {
           columns,
           values,
@@ -53,6 +64,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     } else {
       res.json({
         ready: true,
+        type,
         changeCommit,
         proof,
         publicSignals: formatPublicSignals(publicSignals),
