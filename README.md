@@ -57,6 +57,6 @@ yarn start-node
 yarn start-ui
 ```
 
-## Limitations
-- Currently zk-SQL supports ONLY NUMBERS as sql values
-- As currently compiled circuits support 100 rows, 5 columns, 5 `AND` expessions, 2 `OR` expessions.
+## Limitations (Mainnet)
+- As currently compiled circuits support 10 rows, 5 columns, 5 `AND` expessions, 2 `OR` expessions.
+- Operators `>`, `<`, `>=`, `<=` in `WHERE` expression are possible but disabled to reduce latency.
