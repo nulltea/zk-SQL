@@ -6,8 +6,8 @@ import {getKnownTables} from "./config";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    const provider = new providers.JsonRpcProvider(process.env.CHAIN_RPC);
-    res.json(await requestAllTables(provider));
+    const knownTables = await getKnownTables();
+    res.json(Array.from(knownTables.keys()));
   } catch (error: any) {
     console.log(error);
     res.json([]);
